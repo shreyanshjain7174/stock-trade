@@ -17,6 +17,7 @@ def main() -> int:
     secret = (
         values.get("ALPACA_API_SECRET")
         or values.get("ALPACA_SECRET_KEY")
+        or env.get("ALPACA_API_SECRET")
         or env.get("ALPACA_SECRET_KEY")
     )
 

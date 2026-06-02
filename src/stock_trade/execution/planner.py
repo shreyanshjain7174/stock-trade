@@ -132,9 +132,7 @@ def _plan_item_from_row(
 
 
 def _safe_target_weight(limits: RiskLimits, selected_count: int) -> float:
-    if selected_count <= 0:
-        return 0.0
-    return min(limits.max_position_pct, (1.0 - limits.cash_buffer_pct) / selected_count)
+    return limits.target_weight(selected_count)
 
 
 def _enforce_cash_buffer(

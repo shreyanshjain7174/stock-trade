@@ -101,6 +101,36 @@ def test_trade_plan_respects_cash_buffer() -> None:
     assert sum(item.target_notional for item in plan.items) <= 75_000
 
 
+def test_trade_plan_clamps_target_weight_when_cash_buffer_exceeds_equity() -> None:
+    leaderboard = pd.DataFrame(
+        [
+            {
+                "symbol": "SPY",
+                "strategy": "strategy",
+                "latest_signal": True,
+                "score": 1.0,
+                "validation_sharpe": 1.0,
+                "validation_max_drawdown": -0.05,
+                "test_sharpe": 1.0,
+                "test_max_drawdown": -0.05,
+                "params": "{}",
+            }
+        ]
+    )
+    limits = RiskLimits(
+        max_positions=1,
+        max_position_pct=0.8,
+        cash_buffer_pct=1.25,
+        max_drawdown_pct=0.25,
+        min_validation_sharpe=0.1,
+    )
+
+    plan = build_trade_plan(leaderboard, account_equity=100_000, limits=limits)
+
+    assert plan.items[0].target_weight == 0.0
+    assert plan.items[0].target_notional == 0.0
+
+
 def test_resize_trade_plan_preserves_plan_timestamp() -> None:
     plan = TradePlan(
         generated_at="2026-06-02T00:00:00+00:00",
