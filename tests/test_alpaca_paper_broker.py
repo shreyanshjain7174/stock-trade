@@ -125,6 +125,40 @@ def test_submit_plan_accounts_for_open_order_notional() -> None:
     assert submitted_orders[0].notional == 1_000
 
 
+def test_submit_plan_counts_only_unfilled_pending_order_notional() -> None:
+    submitted_orders = []
+
+    class FakeClient:
+        def get_all_positions(self):
+            return [SimpleNamespace(symbol="SPY", market_value="10000")]
+
+        def get_orders(self):
+            return [
+                SimpleNamespace(
+                    symbol="SPY",
+                    side="buy",
+                    notional="25000",
+                    filled_qty="100",
+                    filled_avg_price="100",
+                    status="partially_filled",
+                )
+            ]
+
+        def submit_order(self, order_data):
+            submitted_orders.append(order_data)
+            return SimpleNamespace(id="order-1")
+
+    broker = object.__new__(AlpacaPaperBroker)
+    broker.client = FakeClient()
+
+    submitted = broker.submit_buy_plan(
+        TradePlan(_plan().generated_at, 100_000, "paper", [_plan().items[0]])
+    )
+
+    assert submitted == []
+    assert submitted_orders == []
+
+
 def test_client_order_id_can_distinguish_rebalance_orders() -> None:
     plan = _plan()
 

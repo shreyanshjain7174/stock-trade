@@ -13,16 +13,18 @@ def run_strategy_sweep(
     fee_bps: float,
     slippage_bps: float,
     specs: list[StrategySpec] | None = None,
+    split_sizes: tuple[int, int, int] | None = None,
 ) -> pd.DataFrame:
     specs = specs or strategy_specs()
     rows: list[dict[str, object]] = []
 
     for symbol in close.columns:
         series = close[symbol].dropna()
-        if len(series) < 504:
+        minimum_observations = sum(split_sizes) if split_sizes is not None else 504
+        if len(series) < minimum_observations:
             continue
 
-        train_end, validation_end = _split_points(series.index)
+        train_end, validation_end = _split_points(series.index, split_sizes)
         train_start = series.index[0]
         validation_start = series.index[train_end]
         test_start = series.index[validation_end]
@@ -65,7 +67,13 @@ def run_strategy_sweep(
     return pd.DataFrame(rows).sort_values(["score", "validation_sharpe"], ascending=False)
 
 
-def _split_points(index: pd.Index) -> tuple[int, int]:
+def _split_points(
+    index: pd.Index,
+    split_sizes: tuple[int, int, int] | None = None,
+) -> tuple[int, int]:
+    if split_sizes is not None:
+        train_size, validation_size, _test_size = split_sizes
+        return train_size, train_size + validation_size
     train_end = max(int(len(index) * 0.60), 1)
     validation_end = max(int(len(index) * 0.80), train_end + 1)
     return train_end, validation_end

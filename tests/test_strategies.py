@@ -1,6 +1,7 @@
 import pandas as pd
 
 from stock_trade.research.strategies import (
+    _rsi,
     strategy_specs,
     swing_breakout_position,
     swing_momentum_position,
@@ -58,3 +59,15 @@ def test_swing_momentum_generates_stateful_positions() -> None:
     assert position.index.equals(close.index)
     assert position.max() == 1.0
     assert 0 < position.mean() < 1
+
+
+def test_rsi_treats_zero_loss_windows_as_overbought() -> None:
+    close = pd.Series(
+        [100, 101, 102, 103, 104, 105],
+        index=pd.date_range("2024-01-01", periods=6),
+        dtype=float,
+    )
+
+    rsi = _rsi(close, window=3)
+
+    assert rsi.iloc[-1] == 100.0

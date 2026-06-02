@@ -33,6 +33,7 @@ def run_walk_forward(
             fee_bps=fee_bps,
             slippage_bps=slippage_bps,
             specs=specs,
+            split_sizes=(train_size, validation_size, test_size),
         )
         if leaderboard.empty:
             continue
@@ -40,6 +41,9 @@ def run_walk_forward(
         annotated.insert(0, "window_id", window_id)
         annotated.insert(1, "window_start", window.index[0].isoformat())
         annotated.insert(2, "window_end", window.index[-1].isoformat())
+        annotated.insert(3, "train_observations", train_size)
+        annotated.insert(4, "validation_observations", validation_size)
+        annotated.insert(5, "test_observations", test_size)
         rows.append(annotated)
 
     if not rows:

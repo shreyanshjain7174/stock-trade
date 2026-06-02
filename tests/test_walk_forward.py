@@ -1,5 +1,6 @@
 import pandas as pd
 
+from stock_trade.research.strategies import StrategySpec
 from stock_trade.research.walk_forward import run_walk_forward, summarize_walk_forward
 
 
@@ -30,6 +31,34 @@ def test_walk_forward_runs_rolling_strategy_sweeps() -> None:
     assert {"window_id", "window_start", "window_end"}.issubset(windows.columns)
     assert windows["window_id"].nunique() >= 3
     assert windows["test_trades"].min() >= 0
+
+
+def test_walk_forward_honors_requested_split_sizes() -> None:
+    def always_long(close: pd.Series) -> pd.Series:
+        return pd.Series(1.0, index=close.index)
+
+    close = pd.DataFrame(
+        {"SPY": [100.0 + index for index in range(20)]},
+        index=pd.date_range("2024-01-01", periods=20, freq="D"),
+    )
+
+    windows = run_walk_forward(
+        close=close,
+        initial_cash=100_000,
+        fee_bps=0,
+        slippage_bps=0,
+        train_size=10,
+        validation_size=4,
+        test_size=3,
+        step_size=3,
+        specs=[StrategySpec("always_long", "test", {}, always_long)],
+    )
+
+    first = windows.iloc[0]
+
+    assert first["train_observations"] == 10
+    assert first["validation_observations"] == 4
+    assert first["test_observations"] == 3
 
 
 def test_walk_forward_summary_scores_consistency() -> None:

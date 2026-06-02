@@ -31,7 +31,8 @@ def _rsi(close: pd.Series, window: int) -> pd.Series:
     gain = delta.clip(lower=0).rolling(window, min_periods=window).mean()
     loss = -delta.clip(upper=0).rolling(window, min_periods=window).mean()
     relative_strength = gain / loss.replace(0, pd.NA)
-    return 100 - (100 / (1 + relative_strength))
+    rsi = 100 - (100 / (1 + relative_strength))
+    return rsi.mask((loss == 0) & (gain > 0), 100.0)
 
 
 def trend_position(close: pd.Series, fast: int, slow: int) -> pd.Series:

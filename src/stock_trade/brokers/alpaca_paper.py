@@ -90,7 +90,9 @@ class AlpacaPaperBroker:
             }:
                 continue
             symbol = str(order.symbol)
-            notional = float(getattr(order, "notional", 0) or 0)
+            notional = _remaining_order_notional(order)
+            if notional <= 0:
+                continue
             side = str(getattr(order, "side", "")).lower()
             signed_notional = notional if side == "buy" else -notional
             values[symbol] = values.get(symbol, 0.0) + signed_notional
@@ -116,3 +118,11 @@ def _client_order_id(
         seed += f":{side}:{notional:.2f}".encode()
     digest = sha256(seed).hexdigest()[:20]
     return f"paper-{symbol.lower()}-{digest}"
+
+
+def _remaining_order_notional(order: object) -> float:
+    notional = float(getattr(order, "notional", 0) or 0)
+    filled_qty = float(getattr(order, "filled_qty", 0) or 0)
+    filled_avg_price = float(getattr(order, "filled_avg_price", 0) or 0)
+    filled_notional = filled_qty * filled_avg_price
+    return max(0.0, notional - filled_notional)
