@@ -93,8 +93,8 @@ def slice_result(result: BacktestResult, start: pd.Timestamp, end: pd.Timestamp)
     returns = result.returns.loc[start:end]
     position = result.effective_position.loc[start:end]
     turnover = position.diff().abs().fillna(position.abs())
-    equity = (1 + returns).cumprod()
-    equity = equity / equity.iloc[0] if not equity.empty and equity.iloc[0] else equity
+    cumulative = (1 + returns).cumprod()
+    equity = pd.Series([1.0, *cumulative.tolist()]) if not cumulative.empty else cumulative
     return BacktestResult(
         metrics=calculate_metrics(returns, equity, position, turnover),
         equity=equity,

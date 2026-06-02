@@ -97,6 +97,45 @@ def test_submit_buy_plan_reconciles_buy_and_sell_deltas() -> None:
     assert submitted_orders[2].notional == 5_000
 
 
+def test_submit_plan_accounts_for_open_order_notional() -> None:
+    submitted_orders = []
+
+    class FakeClient:
+        def get_all_positions(self):
+            return [SimpleNamespace(symbol="SPY", market_value="20000")]
+
+        def get_orders(self):
+            return [SimpleNamespace(symbol="SPY", side="buy", notional="4000", status="open")]
+
+        def submit_order(self, order_data):
+            submitted_orders.append(order_data)
+            return SimpleNamespace(id="order-1")
+
+    broker = object.__new__(AlpacaPaperBroker)
+    broker.client = FakeClient()
+
+    submitted = broker.submit_buy_plan(
+        TradePlan(_plan().generated_at, 100_000, "paper", [_plan().items[0]])
+    )
+
+    assert len(submitted) == 1
+    assert submitted[0].symbol == "SPY"
+    assert submitted[0].side == "buy"
+    assert submitted[0].notional == 1_000
+    assert submitted_orders[0].notional == 1_000
+
+
+def test_client_order_id_can_distinguish_rebalance_orders() -> None:
+    plan = _plan()
+
+    buy_id = _client_order_id(plan, "SPY", side="buy", notional=1000)
+    sell_id = _client_order_id(plan, "SPY", side="sell", notional=1000)
+    resized_buy_id = _client_order_id(plan, "SPY", side="buy", notional=2000)
+
+    assert buy_id != sell_id
+    assert buy_id != resized_buy_id
+
+
 def test_client_order_id_is_stable_for_same_plan() -> None:
     plan = _plan()
 

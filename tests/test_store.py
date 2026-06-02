@@ -57,6 +57,18 @@ def test_sqlite_store_updates_existing_run_status(tmp_path) -> None:
     assert store.get_run("run-1")["status"] == "planned"
 
 
+def test_sqlite_store_preserves_metadata_when_status_updates_without_metadata(tmp_path) -> None:
+    store = SQLiteStore(tmp_path / "ralph.db")
+
+    store.create_run("run-1", mode="paper", status="started", metadata={"source": "agent"})
+    store.create_run("run-1", mode="paper", status="planned")
+
+    run = store.get_run("run-1")
+
+    assert run["status"] == "planned"
+    assert run["metadata"] == {"source": "agent"}
+
+
 def test_sqlite_store_rejects_events_for_missing_run(tmp_path) -> None:
     store = SQLiteStore(tmp_path / "ralph.db")
 

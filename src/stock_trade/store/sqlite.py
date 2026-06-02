@@ -26,16 +26,28 @@ class SQLiteStore:
     ) -> None:
         now = datetime.now(UTC).isoformat()
         with self._connection() as connection:
+            existing = connection.execute(
+                "SELECT metadata_json FROM runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+            if existing is None:
+                connection.execute(
+                    """
+                    INSERT INTO runs (run_id, mode, status, metadata_json, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (run_id, mode, status, json.dumps(metadata or {}), now),
+                )
+                return
+
+            metadata_json = existing[0] if metadata is None else json.dumps(metadata)
             connection.execute(
                 """
-                INSERT INTO runs (run_id, mode, status, metadata_json, created_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT(run_id) DO UPDATE SET
-                    mode = excluded.mode,
-                    status = excluded.status,
-                    metadata_json = excluded.metadata_json
+                UPDATE runs
+                SET mode = ?, status = ?, metadata_json = ?
+                WHERE run_id = ?
                 """,
-                (run_id, mode, status, json.dumps(metadata or {}), now),
+                (mode, status, metadata_json, run_id),
             )
 
     def get_run(self, run_id: str) -> dict[str, Any]:

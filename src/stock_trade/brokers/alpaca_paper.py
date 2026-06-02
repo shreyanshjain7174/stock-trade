@@ -37,12 +37,15 @@ class AlpacaPaperBroker:
         from alpaca.trading.requests import MarketOrderRequest
 
         current_values = self._current_market_values()
+        pending_values = self._pending_order_values()
         target_values = {item.symbol: item.target_notional for item in plan.items}
         plan_symbols = [item.symbol for item in plan.items]
-        symbols = plan_symbols + sorted(set(current_values) - set(target_values))
+        symbols = plan_symbols + sorted(
+            (set(current_values) | set(pending_values)) - set(target_values)
+        )
         submitted: list[SubmittedOrder] = []
         for symbol in symbols:
-            current_notional = current_values.get(symbol, 0.0)
+            current_notional = current_values.get(symbol, 0.0) + pending_values.get(symbol, 0.0)
             target_notional = target_values.get(symbol, 0.0)
             delta_notional = round(target_notional - current_notional, 2)
             if abs(delta_notional) <= 1.0:
@@ -55,7 +58,7 @@ class AlpacaPaperBroker:
                     notional=notional,
                     side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
                     time_in_force=TimeInForce.DAY,
-                    client_order_id=_client_order_id(plan, symbol),
+                    client_order_id=_client_order_id(plan, symbol, side=side, notional=notional),
                 )
             )
             submitted.append(
@@ -72,8 +75,34 @@ class AlpacaPaperBroker:
         positions = self.client.get_all_positions()
         return {str(position.symbol): float(position.market_value) for position in positions}
 
+    def _pending_order_values(self) -> dict[str, float]:
+        if not hasattr(self.client, "get_orders"):
+            return {}
+        values: dict[str, float] = {}
+        for order in self.client.get_orders():
+            status = str(getattr(order, "status", "")).lower()
+            if status and status not in {
+                "open",
+                "new",
+                "accepted",
+                "pending_new",
+                "partially_filled",
+            }:
+                continue
+            symbol = str(order.symbol)
+            notional = float(getattr(order, "notional", 0) or 0)
+            side = str(getattr(order, "side", "")).lower()
+            signed_notional = notional if side == "buy" else -notional
+            values[symbol] = values.get(symbol, 0.0) + signed_notional
+        return values
 
-def _client_order_id(plan: TradePlan, symbol: str) -> str:
+
+def _client_order_id(
+    plan: TradePlan,
+    symbol: str,
+    side: str | None = None,
+    notional: float | None = None,
+) -> str:
     matching_items = [item for item in plan.items if item.symbol == symbol]
     if matching_items:
         item = matching_items[0]
@@ -83,5 +112,7 @@ def _client_order_id(plan: TradePlan, symbol: str) -> str:
         ).encode()
     else:
         seed = f"{plan.mode}:{symbol}".encode()
+    if side is not None and notional is not None:
+        seed += f":{side}:{notional:.2f}".encode()
     digest = sha256(seed).hexdigest()[:20]
     return f"paper-{symbol.lower()}-{digest}"

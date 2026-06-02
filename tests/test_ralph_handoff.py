@@ -1,5 +1,6 @@
 import pandas as pd
 
+from stock_trade.agents.protocols import CandidateDecision, RiskDecision
 from stock_trade.brokers.alpaca_paper import SubmittedOrder
 from stock_trade.config import Settings
 from stock_trade.events.bus import EventBus
@@ -96,6 +97,51 @@ def test_ralph_cycle_execute_refuses_when_state_paused(tmp_path) -> None:
 
     assert broker.submitted is False
     assert result.submitted_orders == []
+
+
+def test_ralph_cycle_execute_submits_empty_plan_for_liquidation(tmp_path) -> None:
+    class RejectingCommittee:
+        def review(self, leaderboard: pd.DataFrame) -> list[CandidateDecision]:
+            return [
+                CandidateDecision(
+                    symbol=str(row.symbol),
+                    strategy=str(row.strategy),
+                    risk_decision=RiskDecision.REJECTED,
+                    risk_reason="signal off",
+                    bull_case="none",
+                    bear_case="risk",
+                    portfolio_decision="exclude",
+                    params=str(row.params),
+                )
+                for row in leaderboard.itertuples(index=False)
+            ]
+
+    class EmptyPlanBroker(FakeBroker):
+        def __init__(self) -> None:
+            super().__init__()
+            self.plan_item_count: int | None = None
+
+        def submit_buy_plan(self, plan):
+            self.submitted = True
+            self.plan_item_count = len(plan.items)
+            return []
+
+    broker = EmptyPlanBroker()
+
+    result = run_cycle(
+        settings=_paper_settings(),
+        bus=EventBus(),
+        store=SQLiteStore(tmp_path / "ralph.db"),
+        prices=_prices(),
+        broker=broker,
+        committee=RejectingCommittee(),
+        loop_state=LoopState(mode=LoopMode.PAPER),
+        execute=True,
+    )
+
+    assert result.plan.items == []
+    assert broker.submitted is True
+    assert broker.plan_item_count == 0
 
 
 def test_kill_switch_cancels_orders_and_blocks_future_execution(tmp_path) -> None:

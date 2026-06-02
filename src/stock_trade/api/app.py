@@ -90,8 +90,8 @@ def create_app(
     def health() -> HealthResponse:
         return HealthResponse(
             status="ok",
-            mode=app_settings.trading_mode,
-            execution_enabled=_execution_enabled(app_settings),
+            mode=state["value"].mode.value,
+            execution_enabled=_execution_enabled(app_settings, state["value"]),
         )
 
     @app.get("/api/account/snapshot", response_model=AccountSnapshotResponse)
@@ -210,8 +210,22 @@ def create_app(
 
     @app.post("/api/system/kill-switch", response_model=ControlResponse)
     def kill_switch(request: ControlRequest) -> ControlResponse:
-        cancelled_order_count = broker.cancel_open_orders()
         state["value"] = state["value"].kill(request.reason)
+        try:
+            cancelled_order_count = broker.cancel_open_orders()
+        except Exception as error:
+            _audit_control(
+                app_store,
+                "kill-switch-cancel-failed",
+                request.reason,
+                state["value"],
+                EventSeverity.CRITICAL,
+                {"cancel_error": str(error)},
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="kill switch cancellation failed",
+            ) from error
         _audit_control(
             app_store,
             "kill-switch",
@@ -267,13 +281,16 @@ def app_settings_path():
     return Path("artifacts/ralph.db")
 
 
-def _execution_enabled(settings: Settings) -> bool:
-    return bool(
+def _execution_enabled(settings: Settings, state: LoopState | None = None) -> bool:
+    enabled = bool(
         settings.trading_mode == "paper"
         and settings.allow_paper_orders
         and settings.alpaca_api_key is not None
         and settings.alpaca_api_secret is not None
     )
+    if state is None:
+        return enabled
+    return enabled and state.can_execute
 
 
 def _control_response(
@@ -283,7 +300,7 @@ def _control_response(
 ) -> ControlResponse:
     return ControlResponse(
         mode=settings.trading_mode,
-        execution_enabled=_execution_enabled(settings),
+        execution_enabled=_execution_enabled(settings, state),
         state={"mode": state.mode.value, "reason": state.reason, **(extra_state or {})},
     )
 

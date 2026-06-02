@@ -26,6 +26,12 @@ class ControlBroker:
         return 2
 
 
+class FailingCancelBroker(ControlBroker):
+    def cancel_open_orders(self) -> int:
+        self.cancelled = True
+        raise RuntimeError("broker unavailable")
+
+
 class PaperExecutor:
     def __init__(self) -> None:
         self.call_count = 0
@@ -154,6 +160,63 @@ def test_api_paper_execute_refuses_after_pause_or_kill_switch(tmp_path) -> None:
     )
     assert killed_execute.status_code == 409
     assert executor.call_count == 1
+
+
+def test_api_health_reports_loop_state_and_execution_disabled_after_controls(tmp_path) -> None:
+    store = SQLiteStore(tmp_path / "ralph.db")
+    client = TestClient(
+        create_app(
+            settings=Settings(
+                trading_mode="paper",
+                allow_paper_orders=True,
+                alpaca_api_key="paper-key",
+                alpaca_api_secret="paper-secret",
+            ),
+            store=store,
+        )
+    )
+
+    assert client.get("/health").json()["mode"] == "paper"
+
+    paused = client.post("/api/system/pause", json={"reason": "operator"})
+    health = client.get("/health")
+
+    assert paused.status_code == 200
+    assert health.json()["mode"] == "paused"
+    assert health.json()["execution_enabled"] is False
+
+
+def test_api_kill_switch_latches_killed_before_cancel_error(tmp_path) -> None:
+    store = SQLiteStore(tmp_path / "ralph.db")
+    executor = PaperExecutor()
+    broker = FailingCancelBroker()
+    client = TestClient(
+        create_app(
+            settings=Settings(
+                trading_mode="paper",
+                allow_paper_orders=True,
+                alpaca_api_key="paper-key",
+                alpaca_api_secret="paper-secret",
+            ),
+            store=store,
+            broker_snapshot=broker,
+            paper_executor=executor,
+        )
+    )
+
+    kill = client.post("/api/system/kill-switch", json={"reason": "operator"})
+    execute = client.post(
+        "/api/paper/execute",
+        json={"paper_only": True, "confirmation_token": "execute-paper"},
+    )
+    health = client.get("/health")
+
+    assert kill.status_code == 502
+    assert broker.cancelled is True
+    assert execute.status_code == 409
+    assert executor.call_count == 0
+    assert health.json()["mode"] == "killed"
+    assert health.json()["execution_enabled"] is False
 
 
 def test_api_controls_emit_audit_events(tmp_path) -> None:

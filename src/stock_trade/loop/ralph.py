@@ -120,7 +120,7 @@ def run_cycle(
     store.create_run(cycle_run_id, mode=settings.trading_mode, status="planned")
 
     submitted_orders: list[object] = []
-    if execute and state.can_execute and broker is not None and plan.items:
+    if execute and state.can_execute and broker is not None:
         submitted_orders = broker.submit_buy_plan(plan)
         _emit(
             bus,
