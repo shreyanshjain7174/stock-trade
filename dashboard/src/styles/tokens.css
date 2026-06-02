@@ -1,0 +1,69 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --bg-deep: #090f1d;
+  --surface: #111c33;
+  --surface-strong: #16223b;
+  --surface-muted: #1d2a45;
+  --border: rgba(248, 250, 252, 0.14);
+  --border-strong: rgba(245, 158, 11, 0.48);
+  --text: #f8fafc;
+  --text-muted: #9aa8bc;
+  --amber: #f59e0b;
+  --amber-soft: #fbbf24;
+  --violet: #8b5cf6;
+  --red: #f87171;
+  --green: #34d399;
+  --blue: #38bdf8;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  --font-body: 'Fira Sans', sans-serif;
+  --font-mono: 'Fira Code', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(248, 250, 252, 0.035) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(rgba(248, 250, 252, 0.035) 1px, transparent 1px) 0 0 / 48px 48px,
+    var(--bg-deep);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+table {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--amber-soft);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

@@ -1,0 +1,1 @@
+"""Research, signal generation, and backtesting."""
