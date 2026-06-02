@@ -22,6 +22,7 @@ const screens: Array<{ id: ScreenId; label: string }> = [
   { id: 'risk', label: 'Risk' },
   { id: 'settings', label: 'Settings' },
 ]
+const DASHBOARD_REFRESH_MS = 15_000
 
 function App() {
   const [status, setStatus] = useState<DashboardStatus | null>(null)
@@ -31,19 +32,31 @@ function App() {
 
   useEffect(() => {
     const controller = new AbortController()
+    let active = true
 
-    fetchDashboardStatus(controller.signal)
-      .then((nextStatus) => {
-        setStatus(nextStatus)
-        setLoadState('ready')
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setLoadState('error')
-        }
-      })
+    const refreshDashboard = () => {
+      fetchDashboardStatus(controller.signal)
+        .then((nextStatus) => {
+          if (active) {
+            setStatus(nextStatus)
+            setLoadState('ready')
+          }
+        })
+        .catch(() => {
+          if (active && !controller.signal.aborted) {
+            setLoadState('error')
+          }
+        })
+    }
 
-    return () => controller.abort()
+    refreshDashboard()
+    const intervalId = window.setInterval(refreshDashboard, DASHBOARD_REFRESH_MS)
+
+    return () => {
+      active = false
+      window.clearInterval(intervalId)
+      controller.abort()
+    }
   }, [])
 
   const dashboard = status ?? mockDashboardStatus

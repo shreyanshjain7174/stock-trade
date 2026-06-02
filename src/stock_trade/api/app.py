@@ -75,7 +75,8 @@ def create_app(
     app_settings = settings or get_settings()
     app_store = store or SQLiteStore(app_settings_path())
     broker = broker_snapshot or EmptyBrokerSnapshot()
-    state = {"value": LoopState(mode=LoopMode.RESEARCH)}
+    initial_mode = LoopMode.PAPER if app_settings.trading_mode == "paper" else LoopMode.RESEARCH
+    state = {"value": LoopState(mode=initial_mode)}
     app = FastAPI(title="stock-trade dashboard API")
     app.add_middleware(
         CORSMiddleware,
@@ -231,6 +232,14 @@ def create_app(
             raise HTTPException(status_code=403, detail="paper execution confirmation required")
         if not _execution_enabled(app_settings):
             raise HTTPException(status_code=403, detail="paper execution gates are not enabled")
+        if not state["value"].can_execute:
+            _audit_control(
+                app_store,
+                "paper-execute-blocked",
+                "loop state does not allow paper execution",
+                state["value"],
+            )
+            raise HTTPException(status_code=409, detail="loop state does not allow paper execution")
         if paper_executor is None:
             _audit_control(
                 app_store,

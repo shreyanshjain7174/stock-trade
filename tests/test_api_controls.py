@@ -28,10 +28,10 @@ class ControlBroker:
 
 class PaperExecutor:
     def __init__(self) -> None:
-        self.called = False
+        self.call_count = 0
 
     def execute_paper(self) -> dict[str, object]:
-        self.called = True
+        self.call_count += 1
         return {"submitted_order_count": 1}
 
 
@@ -114,7 +114,46 @@ def test_api_paper_execute_calls_injected_executor(tmp_path) -> None:
 
     assert response.status_code == 200
     assert response.json()["state"]["submitted_order_count"] == 1
-    assert executor.called is True
+    assert executor.call_count == 1
+
+
+def test_api_paper_execute_refuses_after_pause_or_kill_switch(tmp_path) -> None:
+    store = SQLiteStore(tmp_path / "ralph.db")
+    executor = PaperExecutor()
+    client = TestClient(
+        create_app(
+            settings=Settings(
+                trading_mode="paper",
+                allow_paper_orders=True,
+                alpaca_api_key="paper-key",
+                alpaca_api_secret="paper-secret",
+            ),
+            store=store,
+            paper_executor=executor,
+        )
+    )
+
+    assert client.post("/api/system/pause", json={"reason": "operator"}).status_code == 200
+    paused_execute = client.post(
+        "/api/paper/execute",
+        json={"paper_only": True, "confirmation_token": "execute-paper"},
+    )
+    assert paused_execute.status_code == 409
+
+    assert client.post("/api/system/resume", json={"reason": "operator"}).status_code == 200
+    allowed_execute = client.post(
+        "/api/paper/execute",
+        json={"paper_only": True, "confirmation_token": "execute-paper"},
+    )
+    assert allowed_execute.status_code == 200
+
+    assert client.post("/api/system/kill-switch", json={"reason": "operator"}).status_code == 200
+    killed_execute = client.post(
+        "/api/paper/execute",
+        json={"paper_only": True, "confirmation_token": "execute-paper"},
+    )
+    assert killed_execute.status_code == 409
+    assert executor.call_count == 1
 
 
 def test_api_controls_emit_audit_events(tmp_path) -> None:

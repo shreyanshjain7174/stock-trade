@@ -29,8 +29,9 @@ def main() -> int:
 
     env["ALPACA_API_KEY"] = api_key
     env["ALPACA_SECRET_KEY"] = secret
-    env.setdefault("ALPACA_PAPER_TRADE", "true")
-    env.setdefault("ALPACA_TOOLSETS", "assets,stock-data,news,corporate-actions")
+    env["ALPACA_PAPER_TRADE"] = "true"
+    env["ALPACA_TOOLSETS"] = "assets,stock-data,news,corporate-actions"
+    env.pop("ALPACA_API_SECRET", None)
 
     return subprocess.call(["uvx", "alpaca-mcp-server"], env=env)
 

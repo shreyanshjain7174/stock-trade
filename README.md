@@ -40,6 +40,14 @@ Preview the paper plan:
 uv run stock-trade paper-plan
 ```
 
+Check strategy consistency across rolling train / validation / test windows:
+
+```bash
+uv run stock-trade research-walk-forward --symbols SPY,QQQ,IWM,GLD,TLT --start 2020-01-01
+```
+
+This writes `artifacts/research/walk_forward_windows.csv` and `artifacts/research/walk_forward_summary.csv`. Treat it as a robustness filter before trusting any small-window swing result.
+
 Submit to Alpaca paper only after adding paper credentials to `.env`:
 
 ```bash

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -13,6 +13,7 @@ describe('App safety shell', () => {
 
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
     vi.unstubAllGlobals()
   })
 
@@ -82,6 +83,50 @@ describe('App safety shell', () => {
         expect.objectContaining({ method: 'POST' }),
       )
     })
+  })
+
+  it('refreshes dashboard snapshots after initial load', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/health')) {
+        return Promise.resolve(Response.json({ mode: 'paper', execution_enabled: true }))
+      }
+      if (url.endsWith('/api/account/snapshot')) {
+        return Promise.resolve(
+          Response.json({ snapshot: { mode: 'paper', equity: 100000, cash: 90000 } }),
+        )
+      }
+      if (url.endsWith('/api/risk/status')) {
+        return Promise.resolve(Response.json({ risk: { cash_buffer_pct: 0.1 } }))
+      }
+      if (url.endsWith('/api/positions')) {
+        return Promise.resolve(Response.json({ positions: [] }))
+      }
+      if (url.endsWith('/api/orders/open')) {
+        return Promise.resolve(Response.json({ orders: [] }))
+      }
+      return Promise.reject(new Error(`unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByText('paper linked')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000)
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(fetchMock).toHaveBeenCalledTimes(10)
   })
 
   it('renders all five dashboard screens without hiding safety status', () => {
