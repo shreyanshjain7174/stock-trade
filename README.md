@@ -40,6 +40,12 @@ Preview the paper plan:
 uv run stock-trade paper-plan
 ```
 
+Preview only plan items that passed the walk-forward consistency filter:
+
+```bash
+uv run stock-trade paper-plan --require-consistency
+```
+
 Check strategy consistency across rolling train / validation / test windows:
 
 ```bash
@@ -53,6 +59,8 @@ Submit to Alpaca paper only after adding paper credentials to `.env`:
 ```bash
 TRADING_MODE=paper ALLOW_PAPER_ORDERS=true uv run stock-trade paper-execute --yes
 ```
+
+`paper-execute --yes` requires `artifacts/research/walk_forward_summary.csv` by default and filters the plan to strategies marked `consistent=true`. Use `--skip-consistency-gate` only for explicit research exceptions.
 
 ## Safety Defaults
 

@@ -107,6 +107,35 @@ def resize_trade_plan(plan: TradePlan, account_equity: float, limits: RiskLimits
     )
 
 
+def filter_trade_plan_by_consistency(
+    plan: TradePlan,
+    walk_forward_summary: pd.DataFrame,
+) -> TradePlan:
+    if not plan.items or walk_forward_summary.empty:
+        return TradePlan(
+            generated_at=plan.generated_at,
+            account_equity=plan.account_equity,
+            mode=plan.mode,
+            items=[],
+        )
+
+    consistent = walk_forward_summary[walk_forward_summary["consistent"].map(_truthy)]
+    consistent_keys = {
+        (str(row.symbol), str(row.strategy), str(row.params))
+        for row in consistent.itertuples(index=False)
+    }
+    return TradePlan(
+        generated_at=plan.generated_at,
+        account_equity=plan.account_equity,
+        mode=plan.mode,
+        items=[
+            item
+            for item in plan.items
+            if (item.symbol, item.strategy, item.params) in consistent_keys
+        ],
+    )
+
+
 def _plan_item_from_row(
     row: object,
     account_equity: float,
@@ -133,6 +162,14 @@ def _plan_item_from_row(
 
 def _safe_target_weight(limits: RiskLimits, selected_count: int) -> float:
     return limits.target_weight(selected_count)
+
+
+def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {"true", "1", "yes"}
 
 
 def _enforce_cash_buffer(

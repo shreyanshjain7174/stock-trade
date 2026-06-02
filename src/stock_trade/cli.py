@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+import pandas as pd
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -12,6 +13,7 @@ from stock_trade.execution.planner import (
     TradePlan,
     TradePlanItem,
     build_trade_plan,
+    filter_trade_plan_by_consistency,
     resize_trade_plan,
 )
 from stock_trade.research.data import fetch_adjusted_close, normalize_symbols
@@ -23,6 +25,7 @@ app = typer.Typer(help="Research strategies and execute gated Alpaca paper trade
 console = Console()
 DEFAULT_RESEARCH_OUTPUT_DIR = Path("artifacts/research")
 DEFAULT_PLAN_FILE = Path("artifacts/research/trade_plan.json")
+DEFAULT_WALK_FORWARD_SUMMARY_FILE = Path("artifacts/research/walk_forward_summary.csv")
 
 
 @app.command()
@@ -124,14 +127,26 @@ def research_walk_forward(
 @app.command("paper-plan")
 def paper_plan(
     plan_file: Annotated[Path, typer.Option()] = DEFAULT_PLAN_FILE,
+    require_consistency: Annotated[
+        bool,
+        typer.Option(help="Show only plan items that passed walk-forward consistency."),
+    ] = False,
+    walk_forward_summary: Annotated[Path, typer.Option()] = DEFAULT_WALK_FORWARD_SUMMARY_FILE,
 ) -> None:
     plan = _read_plan(plan_file)
+    if require_consistency:
+        plan = _apply_consistency_gate(plan, walk_forward_summary, required=True)
     _print_plan(plan)
 
 
 @app.command("paper-execute")
 def paper_execute(
     plan_file: Annotated[Path, typer.Option()] = DEFAULT_PLAN_FILE,
+    walk_forward_summary: Annotated[Path, typer.Option()] = DEFAULT_WALK_FORWARD_SUMMARY_FILE,
+    skip_consistency_gate: Annotated[
+        bool,
+        typer.Option(help="Bypass walk-forward consistency filtering for paper execution."),
+    ] = False,
     yes: Annotated[
         bool,
         typer.Option("--yes", help="Submit orders after all env safety gates pass."),
@@ -143,6 +158,10 @@ def paper_execute(
     if not yes:
         console.print("Dry run only. Re-run with --yes after reviewing the plan.")
         raise typer.Exit(0)
+
+    if not skip_consistency_gate:
+        plan = _apply_consistency_gate(plan, walk_forward_summary, required=True)
+        _print_plan(plan)
 
     from stock_trade.brokers.alpaca_paper import AlpacaPaperBroker
 
@@ -160,6 +179,24 @@ def paper_execute(
             f"{order.side.upper()} {order.symbol} ${order.notional:,.2f} "
             f"id={order.broker_order_id}"
         )
+
+
+def _apply_consistency_gate(
+    plan: TradePlan,
+    summary_path: Path,
+    required: bool,
+) -> TradePlan:
+    if not summary_path.exists():
+        if required:
+            console.print("Walk-forward consistency summary is required before paper execution.")
+            raise typer.Exit(1)
+        return plan
+    summary = pd.read_csv(summary_path)
+    filtered = filter_trade_plan_by_consistency(plan, summary)
+    console.print(
+        f"Walk-forward consistency gate kept {len(filtered.items)} of {len(plan.items)} plan items."
+    )
+    return filtered
 
 
 def _risk_limits(settings: object) -> RiskLimits:
