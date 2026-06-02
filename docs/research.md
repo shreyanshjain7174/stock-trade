@@ -61,6 +61,6 @@ Enterprise upgrade path:
 Implementation notes:
 
 - Store both provider timestamp and local received timestamp.
-- The current `stock_trade.news` package starts with a replay-safe `NewsEvent` model and an offline `FixtureNewsProvider`; paid adapters should sit behind the same provider interface and fail closed when keys are missing.
+- The current `stock_trade.news` package includes a replay-safe `NewsEvent` model, an offline `FixtureNewsProvider`, and fixture-tested Finnhub, Polygon, and GDELT adapters. Finnhub and Polygon fail closed when API keys are missing; GDELT is free but delayed research input.
 - Separate headline ingestion, entity/ticker linking, sentiment/event extraction, strategy research, and execution gates.
 - Never let a news agent place orders. Agents can propose candidates; deterministic risk and paper execution gates decide what can be submitted.
