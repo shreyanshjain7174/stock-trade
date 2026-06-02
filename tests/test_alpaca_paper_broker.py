@@ -62,7 +62,7 @@ def test_alpaca_paper_broker_always_constructs_paper_client(monkeypatch) -> None
     assert captured == {"api_key": "paper-key", "secret": "paper-secret", "paper": True}
 
 
-def test_submit_buy_plan_submits_only_positive_delta_notional() -> None:
+def test_submit_buy_plan_reconciles_buy_and_sell_deltas() -> None:
     submitted_orders = []
 
     class FakeClient:
@@ -70,6 +70,7 @@ def test_submit_buy_plan_submits_only_positive_delta_notional() -> None:
             return [
                 SimpleNamespace(symbol="SPY", market_value="24000"),
                 SimpleNamespace(symbol="QQQ", market_value="26000"),
+                SimpleNamespace(symbol="IWM", market_value="5000"),
             ]
 
         def submit_order(self, order_data):
@@ -81,10 +82,19 @@ def test_submit_buy_plan_submits_only_positive_delta_notional() -> None:
 
     submitted = broker.submit_buy_plan(_plan())
 
-    assert len(submitted) == 1
+    assert len(submitted) == 3
     assert submitted[0].symbol == "SPY"
+    assert submitted[0].side == "buy"
     assert submitted[0].notional == 1_000
+    assert submitted[1].symbol == "QQQ"
+    assert submitted[1].side == "sell"
+    assert submitted[1].notional == 1_000
+    assert submitted[2].symbol == "IWM"
+    assert submitted[2].side == "sell"
+    assert submitted[2].notional == 5_000
     assert submitted_orders[0].notional == 1_000
+    assert submitted_orders[1].notional == 1_000
+    assert submitted_orders[2].notional == 5_000
 
 
 def test_client_order_id_is_stable_for_same_plan() -> None:

@@ -40,6 +40,14 @@ class BrokerSnapshotProtocol(Protocol):
     def recent_fills(self) -> list[dict[str, Any]]:
         pass
 
+    def cancel_open_orders(self) -> int:
+        pass
+
+
+class PaperExecutorProtocol(Protocol):
+    def execute_paper(self) -> dict[str, object]:
+        pass
+
 
 class EmptyBrokerSnapshot:
     def account_snapshot(self) -> dict[str, Any]:
@@ -54,11 +62,15 @@ class EmptyBrokerSnapshot:
     def recent_fills(self) -> list[dict[str, Any]]:
         return []
 
+    def cancel_open_orders(self) -> int:
+        return 0
+
 
 def create_app(
     settings: Settings | None = None,
     store: SQLiteStore | None = None,
     broker_snapshot: BrokerSnapshotProtocol | None = None,
+    paper_executor: PaperExecutorProtocol | None = None,
 ) -> FastAPI:
     app_settings = settings or get_settings()
     app_store = store or SQLiteStore(app_settings_path())
@@ -175,9 +187,9 @@ def create_app(
         )
 
     @app.get("/api/events/stream")
-    def event_stream() -> StreamingResponse:
+    def event_stream(run_id: str | None = None) -> StreamingResponse:
         def stream_events():
-            for event in app_store.list_all_events():
+            for event in app_store.iter_all_events(run_id=run_id):
                 yield f"event: {event.type.value}\n"
                 yield f"data: {event.to_json()}\n\n"
 
@@ -197,6 +209,7 @@ def create_app(
 
     @app.post("/api/system/kill-switch", response_model=ControlResponse)
     def kill_switch(request: ControlRequest) -> ControlResponse:
+        cancelled_order_count = broker.cancel_open_orders()
         state["value"] = state["value"].kill(request.reason)
         _audit_control(
             app_store,
@@ -204,8 +217,13 @@ def create_app(
             request.reason,
             state["value"],
             EventSeverity.CRITICAL,
+            {"cancelled_order_count": cancelled_order_count},
         )
-        return _control_response(app_settings, state["value"])
+        return _control_response(
+            app_settings,
+            state["value"],
+            {"cancelled_order_count": cancelled_order_count},
+        )
 
     @app.post("/api/paper/execute", response_model=ControlResponse)
     def paper_execute(request: PaperExecuteRequest) -> ControlResponse:
@@ -213,8 +231,23 @@ def create_app(
             raise HTTPException(status_code=403, detail="paper execution confirmation required")
         if not _execution_enabled(app_settings):
             raise HTTPException(status_code=403, detail="paper execution gates are not enabled")
-        _audit_control(app_store, "paper-execute", "confirmed", state["value"])
-        return _control_response(app_settings, state["value"])
+        if paper_executor is None:
+            _audit_control(
+                app_store,
+                "paper-execute-blocked",
+                "executor unavailable",
+                state["value"],
+            )
+            raise HTTPException(status_code=501, detail="paper execution endpoint is not wired")
+        execution_result = paper_executor.execute_paper()
+        _audit_control(
+            app_store,
+            "paper-execute",
+            "confirmed",
+            state["value"],
+            extra=execution_result,
+        )
+        return _control_response(app_settings, state["value"], execution_result)
 
     return app
 
@@ -234,11 +267,15 @@ def _execution_enabled(settings: Settings) -> bool:
     )
 
 
-def _control_response(settings: Settings, state: LoopState) -> ControlResponse:
+def _control_response(
+    settings: Settings,
+    state: LoopState,
+    extra_state: dict[str, object] | None = None,
+) -> ControlResponse:
     return ControlResponse(
         mode=settings.trading_mode,
         execution_enabled=_execution_enabled(settings),
-        state={"mode": state.mode.value, "reason": state.reason},
+        state={"mode": state.mode.value, "reason": state.reason, **(extra_state or {})},
     )
 
 
@@ -248,6 +285,7 @@ def _audit_control(
     reason: str,
     state: LoopState,
     severity: EventSeverity = EventSeverity.INFO,
+    extra: dict[str, object] | None = None,
 ) -> None:
     run_id = "api-controls"
     store.create_run(run_id, mode=state.mode.value, status="control")
@@ -258,6 +296,6 @@ def _audit_control(
             ts=datetime.now(UTC),
             type=EventType.METRIC_UPDATE,
             severity=severity,
-            payload={"component": "api", "action": action, "reason": reason},
+            payload={"component": "api", "action": action, "reason": reason, **(extra or {})},
         )
     )

@@ -15,6 +15,18 @@ def test_loop_state_can_pause_and_resume_from_paper_mode() -> None:
     assert resumed.reason is None
 
 
+def test_loop_state_keeps_original_mode_when_paused_twice() -> None:
+    paused = LoopState(mode=LoopMode.PAPER).pause("operator")
+
+    paused_again = paused.pause("still waiting")
+    resumed = paused_again.resume("operator")
+
+    assert paused_again.mode is LoopMode.PAUSED
+    assert paused_again.previous_mode is LoopMode.PAPER
+    assert paused_again.reason == "still waiting"
+    assert resumed.mode is LoopMode.PAPER
+
+
 def test_loop_state_blocks_execution_when_not_paper() -> None:
     assert LoopState(mode=LoopMode.RESEARCH).can_execute is False
     assert LoopState(mode=LoopMode.PAPER).can_execute is True

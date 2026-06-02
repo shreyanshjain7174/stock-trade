@@ -30,6 +30,8 @@ class LoopState:
     def pause(self, reason: str) -> LoopState:
         if self.mode is LoopMode.KILLED:
             raise RuntimeError("Killed loop requires manual reset before state changes")
+        if self.mode is LoopMode.PAUSED:
+            return LoopState(mode=LoopMode.PAUSED, previous_mode=self.previous_mode, reason=reason)
         return LoopState(mode=LoopMode.PAUSED, previous_mode=self.mode, reason=reason)
 
     def resume(self, reason: str) -> LoopState:

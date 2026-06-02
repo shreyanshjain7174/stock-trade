@@ -7,8 +7,10 @@ EventSubscriber = Callable[[Event], None]
 
 
 class EventBus:
-    def __init__(self) -> None:
+    def __init__(self, raise_on_error: bool = False) -> None:
         self._subscribers: list[EventSubscriber] = []
+        self.raise_on_error = raise_on_error
+        self.last_errors: list[Exception] = []
 
     def subscribe(self, subscriber: EventSubscriber) -> None:
         self._subscribers.append(subscriber)
@@ -20,7 +22,8 @@ class EventBus:
                 subscriber(event)
             except Exception as error:
                 errors.append(error)
-        if errors:
+        self.last_errors = errors
+        if errors and self.raise_on_error:
             raise ExceptionGroup("event subscriber failures", errors)
 
 

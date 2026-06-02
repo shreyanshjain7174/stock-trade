@@ -13,6 +13,10 @@ class FakeBroker:
     def __init__(self) -> None:
         self.submitted = False
         self.cancelled = False
+        self.equity = 50_000.0
+
+    def account_equity(self) -> float:
+        return self.equity
 
     def submit_buy_plan(self, plan):
         self.submitted = True
@@ -72,6 +76,8 @@ def test_ralph_cycle_execute_submits_only_when_state_allows(tmp_path) -> None:
 
     assert broker.submitted is True
     assert result.submitted_orders
+    assert result.plan.account_equity == 50_000.0
+    assert all(item.target_notional <= 12_500 for item in result.plan.items)
     assert EventType.BROKER_ORDER in [event.type for event in seen]
 
 

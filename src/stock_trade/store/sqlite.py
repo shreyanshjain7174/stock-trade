@@ -77,10 +77,20 @@ class SQLiteStore:
             ).fetchall()
         return [Event.from_json(row[0]) for row in rows]
 
-    def list_all_events(self) -> list[Event]:
+    def list_all_events(self, run_id: str | None = None) -> list[Event]:
+        return list(self.iter_all_events(run_id=run_id))
+
+    def iter_all_events(self, run_id: str | None = None) -> Iterator[Event]:
         with self._connection() as connection:
-            rows = connection.execute("SELECT event_json FROM events ORDER BY rowid").fetchall()
-        return [Event.from_json(row[0]) for row in rows]
+            if run_id is None:
+                rows = connection.execute("SELECT event_json FROM events ORDER BY rowid")
+            else:
+                rows = connection.execute(
+                    "SELECT event_json FROM events WHERE run_id = ? ORDER BY rowid",
+                    (run_id,),
+                )
+            for row in rows:
+                yield Event.from_json(row[0])
 
     def save_plan(self, run_id: str, plan: dict[str, Any]) -> None:
         now = datetime.now(UTC).isoformat()

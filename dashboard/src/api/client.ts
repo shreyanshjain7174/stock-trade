@@ -77,31 +77,38 @@ export async function fetchDashboardStatus(signal?: AbortSignal): Promise<Dashbo
     getJson<ApiOrdersResponse>('/api/orders/open', signal),
   ])
 
+  const equity = account.snapshot?.equity ?? 100000
+  const mappedPositions = (positions.positions ?? []).map((position) => ({
+    symbol: position.symbol ?? 'N/A',
+    marketValue: position.market_value ?? 0,
+    targetWeight: position.target_weight ?? 0,
+    drift: 0,
+    lastDecision: 'unknown',
+  }))
+  const exposurePct =
+    equity > 0
+      ? mappedPositions.reduce((total, position) => total + position.marketValue, 0) / equity
+      : 0
+
   return {
     mode: health.mode,
     executionEnabled: health.execution_enabled,
     brokerStatus: account.snapshot?.mode === 'paper' ? 'paper linked' : 'offline',
     dataFreshness: 'fresh',
     account: {
-      equity: account.snapshot?.equity ?? 100000,
+      equity,
       cash: account.snapshot?.cash ?? 100000,
       dailyPnl: account.snapshot?.daily_pnl ?? 0,
       drawdown: account.snapshot?.drawdown ?? 0,
     },
     risk: {
       cashBufferPct: risk.risk?.cash_buffer_pct ?? 0.1,
-      exposurePct: risk.risk?.max_position_pct ?? 0,
+      exposurePct,
       alerts: health.execution_enabled
         ? []
         : [{ severity: 'warning', message: 'Paper execution is gated by backend controls.' }],
     },
-    positions: (positions.positions ?? []).map((position) => ({
-      symbol: position.symbol ?? 'N/A',
-      marketValue: position.market_value ?? 0,
-      targetWeight: position.target_weight ?? 0,
-      drift: 0,
-      lastDecision: 'unknown',
-    })),
+    positions: mappedPositions,
     openOrders: (orders.orders ?? []).map((order) => ({
       id: order.id ?? `${order.symbol ?? 'order'}-pending`,
       symbol: order.symbol ?? 'N/A',
@@ -117,8 +124,24 @@ export async function fetchDashboardStatus(signal?: AbortSignal): Promise<Dashbo
   }
 }
 
-async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { signal })
+export async function triggerKillSwitch(reason: string): Promise<{
+  mode: DashboardStatus['mode']
+  execution_enabled: boolean
+  state: { mode: DashboardStatus['mode']; reason?: string }
+}> {
+  return getJson('/api/system/kill-switch', undefined, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  })
+}
+
+async function getJson<T>(
+  path: string,
+  signal?: AbortSignal,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, signal })
   if (!response.ok) {
     throw new Error(`Request failed: ${path}`)
   }

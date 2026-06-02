@@ -5,9 +5,40 @@ from stock_trade.config import Settings
 from stock_trade.store.sqlite import SQLiteStore
 
 
+class ControlBroker:
+    def __init__(self) -> None:
+        self.cancelled = False
+
+    def account_snapshot(self):
+        return {}
+
+    def positions(self):
+        return []
+
+    def open_orders(self):
+        return []
+
+    def recent_fills(self):
+        return []
+
+    def cancel_open_orders(self) -> int:
+        self.cancelled = True
+        return 2
+
+
+class PaperExecutor:
+    def __init__(self) -> None:
+        self.called = False
+
+    def execute_paper(self) -> dict[str, object]:
+        self.called = True
+        return {"submitted_order_count": 1}
+
+
 def test_api_pause_resume_and_kill_switch_controls(tmp_path) -> None:
     store = SQLiteStore(tmp_path / "ralph.db")
-    client = TestClient(create_app(settings=Settings(), store=store))
+    broker = ControlBroker()
+    client = TestClient(create_app(settings=Settings(), store=store, broker_snapshot=broker))
 
     pause = client.post("/api/system/pause", json={"reason": "operator"})
     resume = client.post("/api/system/resume", json={"reason": "operator"})
@@ -19,6 +50,8 @@ def test_api_pause_resume_and_kill_switch_controls(tmp_path) -> None:
     assert resume.json()["state"]["mode"] == "research"
     assert kill.status_code == 200
     assert kill.json()["state"]["mode"] == "killed"
+    assert kill.json()["state"]["cancelled_order_count"] == 2
+    assert broker.cancelled is True
 
 
 def test_api_paper_execute_requires_paper_only_and_confirmation(tmp_path) -> None:
@@ -34,6 +67,54 @@ def test_api_paper_execute_requires_paper_only_and_confirmation(tmp_path) -> Non
         ).status_code
         == 403
     )
+
+
+def test_api_paper_execute_does_not_report_success_without_executor(tmp_path) -> None:
+    store = SQLiteStore(tmp_path / "ralph.db")
+    client = TestClient(
+        create_app(
+            settings=Settings(
+                trading_mode="paper",
+                allow_paper_orders=True,
+                alpaca_api_key="paper-key",
+                alpaca_api_secret="paper-secret",
+            ),
+            store=store,
+        )
+    )
+
+    response = client.post(
+        "/api/paper/execute",
+        json={"paper_only": True, "confirmation_token": "execute-paper"},
+    )
+
+    assert response.status_code == 501
+
+
+def test_api_paper_execute_calls_injected_executor(tmp_path) -> None:
+    store = SQLiteStore(tmp_path / "ralph.db")
+    executor = PaperExecutor()
+    client = TestClient(
+        create_app(
+            settings=Settings(
+                trading_mode="paper",
+                allow_paper_orders=True,
+                alpaca_api_key="paper-key",
+                alpaca_api_secret="paper-secret",
+            ),
+            store=store,
+            paper_executor=executor,
+        )
+    )
+
+    response = client.post(
+        "/api/paper/execute",
+        json={"paper_only": True, "confirmation_token": "execute-paper"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"]["submitted_order_count"] == 1
+    assert executor.called is True
 
 
 def test_api_controls_emit_audit_events(tmp_path) -> None:

@@ -28,6 +28,9 @@ class RalphRunResult:
 
 
 class BrokerProtocol(Protocol):
+    def account_equity(self) -> float:
+        pass
+
     def submit_buy_plan(self, plan: TradePlan) -> list[object]:
         pass
 
@@ -88,9 +91,15 @@ def run_cycle(
 
     approved_leaderboard = _approved_leaderboard(leaderboard, candidate_reviews)
 
+    state = loop_state or LoopState(mode=LoopMode.RESEARCH)
+    account_equity = settings.initial_cash
+    if execute and state.can_execute and broker is not None:
+        settings.require_paper_trading()
+        account_equity = broker.account_equity()
+
     plan = build_trade_plan(
         approved_leaderboard,
-        account_equity=settings.initial_cash,
+        account_equity=account_equity,
         limits=_risk_limits(settings),
     )
     store.save_plan(cycle_run_id, plan.to_dict())
@@ -111,9 +120,7 @@ def run_cycle(
     store.create_run(cycle_run_id, mode=settings.trading_mode, status="planned")
 
     submitted_orders: list[object] = []
-    state = loop_state or LoopState(mode=LoopMode.RESEARCH)
     if execute and state.can_execute and broker is not None and plan.items:
-        settings.require_paper_trading()
         submitted_orders = broker.submit_buy_plan(plan)
         _emit(
             bus,

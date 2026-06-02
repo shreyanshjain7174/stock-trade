@@ -63,6 +63,46 @@ def mean_reversion_position(
     return _stateful_position(entry.fillna(False), exit_signal.fillna(True))
 
 
+def swing_pullback_position(
+    close: pd.Series,
+    rsi_window: int,
+    buy_threshold: int,
+    sell_threshold: int,
+    trend_window: int = 20,
+    exit_window: int = 5,
+) -> pd.Series:
+    rsi = _rsi(close, rsi_window)
+    trend = close.rolling(trend_window, min_periods=trend_window).mean()
+    exit_mean = close.rolling(exit_window, min_periods=exit_window).mean()
+    trend_ok = close > trend
+    entry = (rsi < buy_threshold) & trend_ok
+    exit_signal = (rsi > sell_threshold) | (close > exit_mean) | ~trend_ok
+    return _stateful_position(entry.fillna(False), exit_signal.fillna(True))
+
+
+def swing_breakout_position(close: pd.Series, lookback: int, exit_window: int) -> pd.Series:
+    prior_high = close.rolling(lookback, min_periods=lookback).max().shift(1)
+    trailing_low = close.rolling(exit_window, min_periods=exit_window).min().shift(1)
+    entry = close > prior_high
+    exit_signal = close < trailing_low
+    return _stateful_position(entry.fillna(False), exit_signal.fillna(False))
+
+
+def swing_momentum_position(
+    close: pd.Series,
+    momentum_window: int,
+    trend_window: int,
+    min_return: float = 0.015,
+    exit_window: int = 3,
+) -> pd.Series:
+    momentum = close.pct_change(momentum_window)
+    trend = close.rolling(trend_window, min_periods=trend_window).mean()
+    short_return = close.pct_change(exit_window)
+    entry = (momentum > min_return) & (close > trend)
+    exit_signal = (short_return < 0) | (close < trend)
+    return _stateful_position(entry.fillna(False), exit_signal.fillna(True))
+
+
 def _trend_builder(fast: int, slow: int) -> PositionBuilder:
     return lambda close: trend_position(close, fast, slow)
 
@@ -79,6 +119,27 @@ def _mean_reversion_builder(buy_threshold: int, sell_threshold: int) -> Position
         sell_threshold=sell_threshold,
         trend_window=200,
     )
+
+
+def _swing_pullback_builder(
+    rsi_window: int,
+    buy_threshold: int,
+    sell_threshold: int,
+) -> PositionBuilder:
+    return lambda close: swing_pullback_position(
+        close,
+        rsi_window=rsi_window,
+        buy_threshold=buy_threshold,
+        sell_threshold=sell_threshold,
+    )
+
+
+def _swing_breakout_builder(lookback: int, exit_window: int) -> PositionBuilder:
+    return lambda close: swing_breakout_position(close, lookback, exit_window)
+
+
+def _swing_momentum_builder(momentum_window: int, trend_window: int) -> PositionBuilder:
+    return lambda close: swing_momentum_position(close, momentum_window, trend_window)
 
 
 def strategy_specs() -> list[StrategySpec]:
@@ -116,6 +177,47 @@ def strategy_specs() -> list[StrategySpec]:
                     "trend_window": 200,
                 },
                 build_position=_mean_reversion_builder(buy_threshold, sell_threshold),
+            )
+        )
+
+    for rsi_window, buy_threshold, sell_threshold in [(3, 35, 65), (5, 40, 65)]:
+        specs.append(
+            StrategySpec(
+                name=f"swing_pullback_rsi_{rsi_window}_{buy_threshold}_{sell_threshold}",
+                kind="swing_pullback",
+                params={
+                    "rsi_window": rsi_window,
+                    "buy_threshold": buy_threshold,
+                    "sell_threshold": sell_threshold,
+                    "trend_window": 20,
+                    "exit_window": 5,
+                },
+                build_position=_swing_pullback_builder(rsi_window, buy_threshold, sell_threshold),
+            )
+        )
+
+    for lookback, exit_window in [(10, 5), (20, 10)]:
+        specs.append(
+            StrategySpec(
+                name=f"swing_breakout_{lookback}_exit_{exit_window}",
+                kind="swing_breakout",
+                params={"lookback": lookback, "exit_window": exit_window},
+                build_position=_swing_breakout_builder(lookback, exit_window),
+            )
+        )
+
+    for momentum_window, trend_window in [(5, 20), (10, 30)]:
+        specs.append(
+            StrategySpec(
+                name=f"swing_momentum_{momentum_window}_{trend_window}",
+                kind="swing_momentum",
+                params={
+                    "momentum_window": momentum_window,
+                    "trend_window": trend_window,
+                    "min_return": 0.015,
+                    "exit_window": 3,
+                },
+                build_position=_swing_momentum_builder(momentum_window, trend_window),
             )
         )
 

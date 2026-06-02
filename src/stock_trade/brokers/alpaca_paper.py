@@ -30,30 +30,39 @@ class AlpacaPaperBroker:
         return len(self.client.cancel_orders())
 
     def submit_buy_plan(self, plan: TradePlan) -> list[SubmittedOrder]:
+        return self.submit_plan(plan)
+
+    def submit_plan(self, plan: TradePlan) -> list[SubmittedOrder]:
         from alpaca.trading.enums import OrderSide, TimeInForce
         from alpaca.trading.requests import MarketOrderRequest
 
         current_values = self._current_market_values()
+        target_values = {item.symbol: item.target_notional for item in plan.items}
+        plan_symbols = [item.symbol for item in plan.items]
+        symbols = plan_symbols + sorted(set(current_values) - set(target_values))
         submitted: list[SubmittedOrder] = []
-        for item in plan.items:
-            current_notional = current_values.get(item.symbol, 0.0)
-            delta_notional = round(item.target_notional - current_notional, 2)
-            if delta_notional <= 1.0:
+        for symbol in symbols:
+            current_notional = current_values.get(symbol, 0.0)
+            target_notional = target_values.get(symbol, 0.0)
+            delta_notional = round(target_notional - current_notional, 2)
+            if abs(delta_notional) <= 1.0:
                 continue
+            side = "buy" if delta_notional > 0 else "sell"
+            notional = abs(delta_notional)
             order = self.client.submit_order(
                 MarketOrderRequest(
-                    symbol=item.symbol,
-                    notional=delta_notional,
-                    side=OrderSide.BUY,
+                    symbol=symbol,
+                    notional=notional,
+                    side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
                     time_in_force=TimeInForce.DAY,
-                    client_order_id=_client_order_id(plan, item.symbol),
+                    client_order_id=_client_order_id(plan, symbol),
                 )
             )
             submitted.append(
                 SubmittedOrder(
-                    symbol=item.symbol,
-                    side="buy",
-                    notional=delta_notional,
+                    symbol=symbol,
+                    side=side,
+                    notional=notional,
                     broker_order_id=str(order.id),
                 )
             )

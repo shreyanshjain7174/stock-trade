@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import './styles/tokens.css'
 import './App.css'
-import { fetchDashboardStatus, type DashboardStatus } from './api/client'
+import { fetchDashboardStatus, triggerKillSwitch, type DashboardStatus } from './api/client'
 import { KillSwitchButton } from './components/KillSwitchButton'
 import { ModeBadge } from './components/ModeBadge'
 import { StatusPill } from './components/StatusPill'
@@ -52,6 +52,28 @@ function App() {
     [dashboard.risk.alerts],
   )
 
+  async function handleKillSwitchToggle() {
+    if (!killSwitchArmed) {
+      setKillSwitchArmed(true)
+      return
+    }
+    try {
+      const response = await triggerKillSwitch('operator dashboard')
+      setKillSwitchArmed(response.state.mode === 'killed')
+      setStatus((current) =>
+        current
+          ? {
+              ...current,
+              mode: response.state.mode,
+              executionEnabled: response.execution_enabled,
+            }
+          : current,
+      )
+    } catch {
+      setKillSwitchArmed(true)
+    }
+  }
+
   return (
     <main className="ops-shell" aria-busy={loadState === 'loading'}>
       <header className="status-bar" aria-label="Trading system status">
@@ -70,7 +92,9 @@ function App() {
           />
           <KillSwitchButton
             armed={killSwitchArmed}
-            onToggle={() => setKillSwitchArmed((armed) => !armed)}
+            onToggle={() => {
+              void handleKillSwitchToggle()
+            }}
           />
         </div>
       </header>

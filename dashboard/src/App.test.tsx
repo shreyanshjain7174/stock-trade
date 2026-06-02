@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { axe } from 'jest-axe'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -35,6 +35,53 @@ describe('App safety shell', () => {
       'aria-pressed',
       'true',
     )
+  })
+
+  it('calls the backend on confirmed kill-switch action', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/health')) {
+        return Promise.resolve(Response.json({ mode: 'paper', execution_enabled: true }))
+      }
+      if (url.endsWith('/api/account/snapshot')) {
+        return Promise.resolve(
+          Response.json({ snapshot: { mode: 'paper', equity: 100000, cash: 90000 } }),
+        )
+      }
+      if (url.endsWith('/api/risk/status')) {
+        return Promise.resolve(Response.json({ risk: { cash_buffer_pct: 0.1 } }))
+      }
+      if (url.endsWith('/api/positions')) {
+        return Promise.resolve(Response.json({ positions: [] }))
+      }
+      if (url.endsWith('/api/orders/open')) {
+        return Promise.resolve(Response.json({ orders: [] }))
+      }
+      if (url.endsWith('/api/system/kill-switch')) {
+        return Promise.resolve(
+          Response.json({
+            mode: 'paper',
+            execution_enabled: false,
+            state: { mode: 'killed', reason: 'operator dashboard' },
+          }),
+        )
+      }
+      return Promise.reject(new Error(`unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    const killSwitch = await screen.findByRole('button', { name: 'Kill switch' })
+    fireEvent.click(killSwitch)
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm kill switch' }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://127.0.0.1:8000/api/system/kill-switch',
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
   })
 
   it('renders all five dashboard screens without hiding safety status', () => {

@@ -37,12 +37,11 @@ def test_event_bus_continues_after_subscriber_error() -> None:
     bus.subscribe(broken_subscriber)
     bus.subscribe(lambda event: seen.append(event.event_id))
 
-    try:
-        bus.publish(_event("evt-1"))
-    except ExceptionGroup as error:
-        assert len(error.exceptions) == 1
+    bus.publish(_event("evt-1"))
 
     assert seen == ["evt-1"]
+    assert len(bus.last_errors) == 1
+    assert "failed evt-1" in str(bus.last_errors[0])
 
 
 def test_jsonl_event_sink_appends_events(tmp_path) -> None:
