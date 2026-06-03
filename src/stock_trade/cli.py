@@ -17,6 +17,7 @@ from stock_trade.execution.planner import (
     resize_trade_plan,
 )
 from stock_trade.research.data import fetch_adjusted_close, normalize_symbols
+from stock_trade.research.loop import run_research_loop
 from stock_trade.research.sweep import run_strategy_sweep
 from stock_trade.research.walk_forward import run_walk_forward, summarize_walk_forward
 from stock_trade.risk import RiskLimits
@@ -122,6 +123,62 @@ def research_walk_forward(
 
     _print_walk_forward_summary(summary.head(10))
     console.print(f"Wrote {windows_path} and {summary_path}")
+
+
+@app.command("research-loop")
+def research_loop(
+    symbols: Annotated[
+        str,
+        typer.Option(help="Comma-separated symbols. Defaults to DEFAULT_UNIVERSE."),
+    ] = "",
+    start: Annotated[str, typer.Option(help="Research start date.")] = "2018-01-01",
+    end: Annotated[
+        str | None,
+        typer.Option(help="Exclusive end date, defaults to today."),
+    ] = None,
+    iterations: Annotated[int, typer.Option(help="Number of bounded research iterations.")] = 1,
+    train_size: Annotated[int, typer.Option(help="Training bars per rolling window.")] = 504,
+    validation_size: Annotated[int, typer.Option(help="Validation bars per rolling window.")] = 126,
+    test_size: Annotated[
+        int,
+        typer.Option(help="Out-of-sample test bars per rolling window."),
+    ] = 126,
+    step_size: Annotated[int, typer.Option(help="Bars to advance each rolling window.")] = 126,
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for outputs."),
+    ] = DEFAULT_RESEARCH_OUTPUT_DIR,
+) -> None:
+    settings = get_settings()
+    universe = normalize_symbols(symbols or settings.default_universe)
+    console.print(f"Running paper-only research loop for {', '.join(universe)}")
+    close = fetch_adjusted_close(universe, start=start, end=end or date.today().isoformat())
+    results = run_research_loop(
+        close=close,
+        settings=settings,
+        output_dir=output_dir,
+        iterations=iterations,
+        train_size=train_size,
+        validation_size=validation_size,
+        test_size=test_size,
+        step_size=step_size,
+    )
+
+    loop_table = Table(title="Research Loop Summary")
+    for column in ["iteration", "leaderboard_rows", "plan_items", "consistent_items"]:
+        loop_table.add_column(column)
+    for result in results:
+        loop_table.add_row(
+            str(result.iteration),
+            str(result.leaderboard_rows),
+            str(result.plan_items),
+            str(result.consistent_items),
+        )
+    console.print(loop_table)
+
+    consistent_plan = _read_plan(output_dir / "consistent_trade_plan.json")
+    _print_plan(consistent_plan)
+    console.print(f"Wrote research loop artifacts under {output_dir}")
 
 
 @app.command("paper-plan")

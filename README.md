@@ -54,6 +54,14 @@ uv run stock-trade research-walk-forward --symbols SPY,QQQ,IWM,GLD,TLT --start 2
 
 This writes `artifacts/research/walk_forward_windows.csv` and `artifacts/research/walk_forward_summary.csv`. Treat it as a robustness filter before trusting any small-window swing result.
 
+Run a bounded paper-only research loop that refreshes the leaderboard, walk-forward consistency report, raw plan, and consistency-filtered plan:
+
+```bash
+uv run stock-trade research-loop --iterations 3 --start 2018-01-01
+```
+
+This writes `artifacts/research/research_loop_summary.csv` and `artifacts/research/consistent_trade_plan.json`. It does not submit orders; use it as the continuous learning loop before any separately gated paper execution.
+
 Submit to Alpaca paper only after adding paper credentials to `.env`:
 
 ```bash
