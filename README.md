@@ -60,7 +60,7 @@ Run a bounded paper-only research loop that refreshes the leaderboard, walk-forw
 uv run stock-trade research-loop --iterations 3 --start 2018-01-01
 ```
 
-This writes `artifacts/research/research_loop_summary.csv` and `artifacts/research/consistent_trade_plan.json`. It does not submit orders; use it as the continuous learning loop before any separately gated paper execution.
+This writes `artifacts/research/research_loop_summary.csv` and `artifacts/research/consistent_trade_plan.json`. The consistency plan is selected from all current signals that passed walk-forward robustness checks, not just from the raw top-ranked plan. It does not submit orders; use it as the continuous learning loop before any separately gated paper execution.
 
 Submit to Alpaca paper only after adding paper credentials to `.env`:
 

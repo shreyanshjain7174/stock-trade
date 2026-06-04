@@ -7,6 +7,7 @@ from stock_trade.cli import app
 from stock_trade.execution.planner import (
     TradePlan,
     TradePlanItem,
+    build_consistent_trade_plan,
     build_trade_plan,
     filter_trade_plan_by_consistency,
     resize_trade_plan,
@@ -246,3 +247,80 @@ def test_filter_trade_plan_by_consistency_keeps_only_consistent_items() -> None:
     assert [item.symbol for item in filtered.items] == ["SPY"]
     assert filtered.account_equity == plan.account_equity
     assert filtered.generated_at == plan.generated_at
+
+
+def test_consistent_trade_plan_selects_from_all_consistent_current_signals() -> None:
+    leaderboard = pd.DataFrame(
+        [
+            {
+                "symbol": "QQQ",
+                "strategy": "raw_winner",
+                "latest_signal": True,
+                "score": 5.0,
+                "validation_sharpe": 5.0,
+                "validation_max_drawdown": -0.05,
+                "test_sharpe": 0.5,
+                "test_max_drawdown": -0.05,
+                "params": "{}",
+            },
+            {
+                "symbol": "SPY",
+                "strategy": "consistent_spy",
+                "latest_signal": True,
+                "score": 1.0,
+                "validation_sharpe": 1.0,
+                "validation_max_drawdown": -0.05,
+                "test_sharpe": 1.0,
+                "test_max_drawdown": -0.05,
+                "params": "{}",
+            },
+            {
+                "symbol": "GLD",
+                "strategy": "consistent_gld",
+                "latest_signal": True,
+                "score": 0.9,
+                "validation_sharpe": 0.9,
+                "validation_max_drawdown": -0.05,
+                "test_sharpe": 0.9,
+                "test_max_drawdown": -0.05,
+                "params": "{}",
+            },
+        ]
+    )
+    summary = pd.DataFrame(
+        [
+            {
+                "symbol": "QQQ",
+                "strategy": "raw_winner",
+                "params": "{}",
+                "consistent": False,
+                "consistency_score": 3.0,
+            },
+            {
+                "symbol": "SPY",
+                "strategy": "consistent_spy",
+                "params": "{}",
+                "consistent": True,
+                "consistency_score": 2.0,
+            },
+            {
+                "symbol": "GLD",
+                "strategy": "consistent_gld",
+                "params": "{}",
+                "consistent": True,
+                "consistency_score": 2.5,
+            },
+        ]
+    )
+    limits = RiskLimits(
+        max_positions=2,
+        max_position_pct=0.25,
+        cash_buffer_pct=0.1,
+        max_drawdown_pct=0.25,
+        min_validation_sharpe=0.1,
+    )
+
+    plan = build_consistent_trade_plan(leaderboard, summary, account_equity=100_000, limits=limits)
+
+    assert [item.symbol for item in plan.items] == ["GLD", "SPY"]
+    assert all(item.target_notional == 25_000 for item in plan.items)

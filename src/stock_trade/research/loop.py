@@ -9,8 +9,8 @@ import pandas as pd
 from stock_trade.config import Settings
 from stock_trade.execution.planner import (
     TradePlan,
+    build_consistent_trade_plan,
     build_trade_plan,
-    filter_trade_plan_by_consistency,
 )
 from stock_trade.research.strategies import StrategySpec
 from stock_trade.research.sweep import run_strategy_sweep
@@ -70,7 +70,12 @@ def run_research_loop(
             max_drawdown_pct=settings.max_drawdown_pct,
         )
         plan = build_trade_plan(leaderboard, account_equity=settings.initial_cash, limits=limits)
-        consistent_plan = filter_trade_plan_by_consistency(plan, summary)
+        consistent_plan = build_consistent_trade_plan(
+            leaderboard,
+            summary,
+            account_equity=settings.initial_cash,
+            limits=limits,
+        )
 
         _write_iteration_artifacts(output_dir, leaderboard, windows, summary, plan, consistent_plan)
         results.append(

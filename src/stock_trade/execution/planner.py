@@ -136,6 +136,59 @@ def filter_trade_plan_by_consistency(
     )
 
 
+def build_consistent_trade_plan(
+    leaderboard: pd.DataFrame,
+    walk_forward_summary: pd.DataFrame,
+    account_equity: float,
+    limits: RiskLimits,
+    mode: str = "paper",
+) -> TradePlan:
+    if leaderboard.empty or walk_forward_summary.empty:
+        return _empty_plan(account_equity, mode)
+
+    consistent = walk_forward_summary[walk_forward_summary["consistent"].map(_truthy)].copy()
+    if consistent.empty:
+        return _empty_plan(account_equity, mode)
+
+    candidates = leaderboard.merge(
+        consistent[["symbol", "strategy", "params", "consistency_score"]],
+        on=["symbol", "strategy", "params"],
+        how="inner",
+    )
+    candidates = candidates[candidates["latest_signal"]].copy()
+    candidates = candidates[
+        candidates.apply(
+            lambda row: limits.passes_strategy_gate(
+                validation_sharpe=float(row["validation_sharpe"]),
+                validation_max_drawdown=float(row["validation_max_drawdown"]),
+            ),
+            axis=1,
+        )
+    ]
+    if candidates.empty:
+        return _empty_plan(account_equity, mode)
+
+    selected = (
+        candidates.sort_values(
+            ["consistency_score", "score", "validation_sharpe"],
+            ascending=False,
+        )
+        .drop_duplicates(subset=["symbol"], keep="first")
+        .head(limits.max_positions)
+    )
+    target_weight = _safe_target_weight(limits, len(selected))
+    items = [
+        _plan_item_from_row(row, account_equity, limits, target_weight)
+        for row in selected.itertuples(index=False)
+    ]
+    return TradePlan(
+        generated_at=datetime.now(UTC).isoformat(),
+        account_equity=account_equity,
+        mode=mode,
+        items=_enforce_cash_buffer(items, account_equity, limits),
+    )
+
+
 def _plan_item_from_row(
     row: object,
     account_equity: float,
