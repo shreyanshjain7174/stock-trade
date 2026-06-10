@@ -1,0 +1,476 @@
+.ops-shell {
+  width: min(1500px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.status-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  min-height: 88px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--amber);
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.identity-block h1,
+.panel-heading h2 {
+  margin: 0;
+}
+
+.identity-block h1 {
+  font-size: clamp(1.3rem, 1vw + 1rem, 2.1rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  color: var(--amber-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.status-pill,
+.metric,
+.order-row,
+.alert {
+  border: 1px solid var(--border);
+  background: rgba(17, 28, 51, 0.78);
+}
+
+.status-pill {
+  min-width: 118px;
+  padding: 9px 12px;
+}
+
+.status-pill span,
+.metric span,
+.risk-meter span,
+.order-row small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.status-pill strong,
+.metric strong,
+.risk-meter strong,
+.order-row strong {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+.status-pill.paper,
+.status-pill.warning {
+  border-color: rgba(245, 158, 11, 0.58);
+}
+
+.status-pill.safe {
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
+.kill-switch {
+  min-width: 148px;
+  min-height: 44px;
+  border: 1px solid rgba(248, 113, 113, 0.65);
+  background: rgba(127, 29, 29, 0.32);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.kill-switch.armed {
+  background: var(--red);
+  color: #111827;
+}
+
+.notice-panel,
+.panel {
+  border: 1px solid var(--border);
+  background: rgba(17, 28, 51, 0.74);
+}
+
+.notice-panel {
+  margin-top: 16px;
+  padding: 12px 16px;
+  color: var(--amber-soft);
+  font-family: var(--font-mono);
+}
+
+.screen-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.screen-tabs button {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: rgba(17, 28, 51, 0.68);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.screen-tabs button.active {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.command-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.single-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 18px;
+}
+
+.surface-strong {
+  background: linear-gradient(140deg, rgba(22, 34, 59, 0.95), rgba(17, 28, 51, 0.74));
+}
+
+.agent-panel,
+.orders-panel,
+.risk-panel {
+  grid-column: 2;
+}
+
+.positions-panel {
+  grid-row: span 2;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel-heading.compact {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel-heading h2 {
+  font-size: 1.1rem;
+  line-height: 1.1;
+}
+
+.equity-value {
+  margin: 8px 0 16px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: clamp(2.4rem, 5vw, 5.8rem);
+  font-weight: 700;
+  line-height: 0.95;
+}
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric {
+  min-height: 70px;
+  padding: 12px;
+}
+
+.metric.warning strong,
+.alert.warning span {
+  color: var(--amber-soft);
+}
+
+.equity-curve {
+  display: block;
+  width: 100%;
+  height: 190px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  background: rgba(9, 15, 29, 0.62);
+}
+
+.equity-curve polyline {
+  fill: none;
+  stroke: var(--amber);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.5;
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.35));
+}
+
+.risk-meter {
+  --risk-level: 0%;
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(90deg, rgba(245, 158, 11, 0.18) var(--risk-level), transparent 0),
+    rgba(9, 15, 29, 0.62);
+}
+
+.alert-stack,
+.timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.alert {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.alert span {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.alert p,
+.timeline p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.alert.safe span {
+  color: var(--green);
+}
+
+.alert.critical span {
+  color: var(--red);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+td {
+  font-family: var(--font-mono);
+}
+
+.timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px;
+}
+
+.timeline-expanded li {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.timeline-marker {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border: 1px solid var(--amber-soft);
+  background: var(--surface-muted);
+}
+
+.timeline-marker.done {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.timeline-marker.blocked {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.timeline strong,
+.order-row span {
+  font-family: var(--font-mono);
+}
+
+.order-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+}
+
+.empty-state {
+  padding: 20px;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+}
+
+.trace-drawer {
+  border: 1px solid var(--border);
+  background: rgba(9, 15, 29, 0.42);
+}
+
+.trace-drawer + .trace-drawer {
+  margin-top: 10px;
+}
+
+.trace-drawer summary {
+  min-height: 44px;
+  padding: 12px;
+  color: var(--amber-soft);
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+
+.trace-drawer div {
+  padding: 0 12px 12px;
+  color: var(--text-muted);
+}
+
+.risk-chip {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.risk-chip.safe {
+  border-color: rgba(52, 211, 153, 0.46);
+  color: var(--green);
+}
+
+.risk-chip.warning {
+  border-color: var(--border-strong);
+  color: var(--amber-soft);
+}
+
+.risk-chip.critical {
+  border-color: rgba(248, 113, 113, 0.68);
+  color: var(--red);
+}
+
+.risk-limits-grid,
+.integration-list {
+  display: grid;
+  gap: 10px;
+}
+
+.risk-limit,
+.integration-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: rgba(9, 15, 29, 0.42);
+}
+
+.risk-limit span,
+.integration-row span,
+.muted-copy {
+  color: var(--text-muted);
+}
+
+.risk-limit strong,
+.integration-row strong {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 1100px) {
+  .status-bar,
+  .command-grid,
+  .single-screen {
+    grid-template-columns: 1fr;
+  }
+
+  .status-cluster {
+    justify-content: flex-start;
+  }
+
+  .agent-panel,
+  .orders-panel,
+  .risk-panel,
+  .positions-panel,
+  .equity-panel {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .ops-shell {
+    padding: 12px;
+  }
+
+  .status-cluster,
+  .metric-row {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .status-pill,
+  .kill-switch {
+    width: 100%;
+  }
+}

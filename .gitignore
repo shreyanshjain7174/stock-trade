@@ -1,0 +1,23 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local secrets and machine-specific config
+.env
+.env.*
+!.env.example
+
+# Frontend dependencies and build output
+node_modules/
+dashboard/node_modules/
+dashboard/dist/
+
+# Generated local research/smoke artifacts
+artifacts/

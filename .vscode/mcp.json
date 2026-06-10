@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "alpaca": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}",
+        "python",
+        "${workspaceFolder}/scripts/run_alpaca_mcp.py"
+      ]
+    }
+  }
+}

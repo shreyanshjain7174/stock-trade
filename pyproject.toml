@@ -1,0 +1,53 @@
+[project]
+name = "stock-trade"
+version = "0.1.0"
+description = "Algorithmic trading research and Alpaca paper-trading scaffold"
+readme = "README.md"
+authors = [
+    { name = "Shreyansh Sancheti", email = "43677304+shreyanshjain7174@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alpaca-py>=0.43.0",
+    "fastapi>=0.124.0",
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "python-dotenv>=1.0.1",
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+    "uvicorn>=0.38.0",
+    "yfinance>=0.2.54",
+]
+
+[project.scripts]
+stock-trade = "stock_trade.cli:main"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.0",
+    "mcp>=1.27.2",
+    "pytest>=8.2.0",
+    "ruff>=0.6.0",
+]
+
+[project.optional-dependencies]
+research = [
+    "quantstats>=0.0.64",
+    "vectorbt>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
