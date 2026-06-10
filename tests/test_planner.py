@@ -3,7 +3,7 @@ import json
 import pandas as pd
 from typer.testing import CliRunner
 
-from stock_trade.cli import app
+from stock_trade.cli import _read_paper_execution_plan, app
 from stock_trade.execution.planner import (
     TradePlan,
     TradePlanItem,
@@ -61,6 +61,111 @@ def test_paper_execute_with_yes_requires_consistency_summary(tmp_path) -> None:
 
     assert result.exit_code != 0
     assert "Walk-forward consistency summary is required" in result.output
+
+
+def test_paper_execution_plan_prefers_consistency_selected_sibling(tmp_path) -> None:
+    raw_plan_path = tmp_path / "trade_plan.json"
+    raw_plan_path.write_text(
+        json.dumps(
+            TradePlan(
+                generated_at="2026-06-02T00:00:00+00:00",
+                account_equity=100_000,
+                mode="paper",
+                items=[
+                    TradePlanItem(
+                        symbol="SPY",
+                        strategy="raw_top_ranked",
+                        target_weight=0.25,
+                        target_notional=25_000,
+                        score=2.0,
+                        validation_sharpe=2.0,
+                        test_sharpe=0.5,
+                        test_max_drawdown=-0.05,
+                        params="{}",
+                    )
+                ],
+            ).to_dict()
+        ),
+        encoding="utf-8",
+    )
+    consistent_plan_path = tmp_path / "consistent_trade_plan.json"
+    consistent_plan_path.write_text(
+        json.dumps(
+            TradePlan(
+                generated_at="2026-06-02T00:00:00+00:00",
+                account_equity=100_000,
+                mode="paper",
+                items=[
+                    TradePlanItem(
+                        symbol="QQQ",
+                        strategy="consistent_selected",
+                        target_weight=0.25,
+                        target_notional=25_000,
+                        score=1.0,
+                        validation_sharpe=1.0,
+                        test_sharpe=1.0,
+                        test_max_drawdown=-0.05,
+                        params="{}",
+                    )
+                ],
+            ).to_dict()
+        ),
+        encoding="utf-8",
+    )
+
+    selected = _read_paper_execution_plan(
+        raw_plan_path,
+        tmp_path / "missing_summary.csv",
+        skip_consistency_gate=False,
+    )
+
+    assert [item.symbol for item in selected.items] == ["QQQ"]
+
+
+def test_paper_execution_plan_can_skip_consistency_sibling(tmp_path) -> None:
+    raw_plan_path = tmp_path / "trade_plan.json"
+    raw_plan_path.write_text(
+        json.dumps(
+            TradePlan(
+                generated_at="2026-06-02T00:00:00+00:00",
+                account_equity=100_000,
+                mode="paper",
+                items=[],
+            ).to_dict()
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "consistent_trade_plan.json").write_text(
+        json.dumps(
+            TradePlan(
+                generated_at="2026-06-02T00:00:00+00:00",
+                account_equity=100_000,
+                mode="paper",
+                items=[
+                    TradePlanItem(
+                        symbol="QQQ",
+                        strategy="consistent_selected",
+                        target_weight=0.25,
+                        target_notional=25_000,
+                        score=1.0,
+                        validation_sharpe=1.0,
+                        test_sharpe=1.0,
+                        test_max_drawdown=-0.05,
+                        params="{}",
+                    )
+                ],
+            ).to_dict()
+        ),
+        encoding="utf-8",
+    )
+
+    selected = _read_paper_execution_plan(
+        raw_plan_path,
+        tmp_path / "missing_summary.csv",
+        skip_consistency_gate=True,
+    )
+
+    assert selected.items == []
 
 
 def test_trade_plan_ranks_by_score_not_test_sharpe() -> None:

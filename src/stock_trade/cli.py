@@ -216,9 +216,12 @@ def paper_execute(
         console.print("Dry run only. Re-run with --yes after reviewing the plan.")
         raise typer.Exit(0)
 
-    if not skip_consistency_gate:
-        plan = _apply_consistency_gate(plan, walk_forward_summary, required=True)
-        _print_plan(plan)
+    plan = _read_paper_execution_plan(
+        plan_file,
+        walk_forward_summary,
+        skip_consistency_gate=skip_consistency_gate,
+    )
+    _print_plan(plan)
 
     from stock_trade.brokers.alpaca_paper import AlpacaPaperBroker
 
@@ -254,6 +257,23 @@ def _apply_consistency_gate(
         f"Walk-forward consistency gate kept {len(filtered.items)} of {len(plan.items)} plan items."
     )
     return filtered
+
+
+def _read_paper_execution_plan(
+    plan_file: Path,
+    walk_forward_summary: Path,
+    skip_consistency_gate: bool,
+) -> TradePlan:
+    plan = _read_plan(plan_file)
+    if skip_consistency_gate:
+        return plan
+
+    consistency_selected_plan = plan_file.with_name("consistent_trade_plan.json")
+    if consistency_selected_plan.exists():
+        console.print(f"Using consistency-selected plan from {consistency_selected_plan}.")
+        return _read_plan(consistency_selected_plan)
+
+    return _apply_consistency_gate(plan, walk_forward_summary, required=True)
 
 
 def _risk_limits(settings: object) -> RiskLimits:

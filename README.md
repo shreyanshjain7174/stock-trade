@@ -69,6 +69,7 @@ TRADING_MODE=paper ALLOW_PAPER_ORDERS=true uv run stock-trade paper-execute --ye
 ```
 
 `paper-execute --yes` requires `artifacts/research/walk_forward_summary.csv` by default and filters the plan to strategies marked `consistent=true`. Use `--skip-consistency-gate` only for explicit research exceptions.
+When `artifacts/research/consistent_trade_plan.json` exists, `paper-execute --yes` uses that consistency-selected plan by default instead of re-filtering only the raw top-ranked plan.
 
 ## Safety Defaults
 
