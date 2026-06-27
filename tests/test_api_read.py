@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
@@ -61,6 +62,69 @@ def test_api_read_endpoints_return_dashboard_state(tmp_path) -> None:
     assert client.get("/api/research/runs/run-1").json()["run"]["metadata"] == {"source": "test"}
     assert client.get("/api/research/runs/run-1/leaderboard").json()["plan"]["items"]
     assert client.get("/api/agent/runs/run-1/trace").json()["trace"][0]["agent_name"] == "committee"
+
+
+def test_api_research_artifacts_latest_returns_loop_outputs(tmp_path) -> None:
+    artifacts_dir = tmp_path / "research"
+    artifacts_dir.mkdir()
+    (artifacts_dir / "leaderboard.csv").write_text(
+        "symbol,strategy,score\nSPY,trend_sma_20_100,1.2\n",
+        encoding="utf-8",
+    )
+    (artifacts_dir / "walk_forward_summary.csv").write_text(
+        "symbol,strategy,consistent\nSPY,trend_sma_20_100,true\n",
+        encoding="utf-8",
+    )
+    (artifacts_dir / "research_loop_summary.csv").write_text(
+        "iteration,leaderboard_rows,plan_items,consistent_items\n1,10,3,2\n",
+        encoding="utf-8",
+    )
+    (artifacts_dir / "trade_plan.json").write_text(
+        json.dumps({"items": [{"symbol": "QQQ"}]}),
+        encoding="utf-8",
+    )
+    (artifacts_dir / "consistent_trade_plan.json").write_text(
+        json.dumps({"items": [{"symbol": "SPY"}]}),
+        encoding="utf-8",
+    )
+    client = TestClient(
+        create_app(
+            settings=Settings(),
+            store=SQLiteStore(tmp_path / "ralph.db"),
+            research_artifacts_dir=artifacts_dir,
+        )
+    )
+
+    response = client.get("/api/research/artifacts/latest")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["artifacts"]["leaderboard"][0]["symbol"] == "SPY"
+    assert body["artifacts"]["walk_forward_summary"][0]["consistent"] == "true"
+    assert body["artifacts"]["research_loop_summary"][0]["consistent_items"] == "2"
+    assert body["artifacts"]["trade_plan"]["items"][0]["symbol"] == "QQQ"
+    assert body["artifacts"]["consistent_trade_plan"]["items"][0]["symbol"] == "SPY"
+    assert body["missing"] == []
+
+
+def test_api_research_artifacts_latest_reports_missing_files(tmp_path) -> None:
+    artifacts_dir = tmp_path / "research"
+    artifacts_dir.mkdir()
+    client = TestClient(
+        create_app(
+            settings=Settings(),
+            store=SQLiteStore(tmp_path / "ralph.db"),
+            research_artifacts_dir=artifacts_dir,
+        )
+    )
+
+    response = client.get("/api/research/artifacts/latest")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["artifacts"] == {}
+    assert "leaderboard.csv" in body["missing"]
+    assert "consistent_trade_plan.json" in body["missing"]
 
 
 def test_api_trace_endpoint_returns_404_for_unknown_run(tmp_path) -> None:

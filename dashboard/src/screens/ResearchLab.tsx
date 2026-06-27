@@ -1,11 +1,16 @@
 import { RiskChip } from '../components/RiskChip'
+import type { DashboardStatus } from '../api/client'
 
-const candidateRows = [
-  { symbol: 'SPY', strategy: 'trend_sma_50_150', score: 0.6, holdout: 1.78, state: 'approved' },
-  { symbol: 'QQQ', strategy: 'trend_sma_50_200', score: 0.3, holdout: 2.02, state: 'resized' },
-]
+interface ResearchLabProps {
+  research: DashboardStatus['research']
+}
 
-export function ResearchLab() {
+export function ResearchLab({ research }: ResearchLabProps) {
+  const rows = research.candidates
+  const consistentLabel = research.loopSummary
+    ? `${research.loopSummary.consistentItems} consistent ${research.loopSummary.consistentItems === 1 ? 'item' : 'items'}`
+    : 'No loop summary yet'
+
   return (
     <section className="screen-grid single-screen" aria-label="Research Lab">
       <section className="panel surface-strong">
@@ -25,17 +30,23 @@ export function ResearchLab() {
               </tr>
             </thead>
             <tbody>
-              {candidateRows.map((candidate) => (
-                <tr key={`${candidate.symbol}-${candidate.strategy}`}>
-                  <td>{candidate.symbol}</td>
-                  <td>{candidate.strategy}</td>
-                  <td>{candidate.score.toFixed(2)}</td>
-                  <td>{candidate.holdout.toFixed(2)} report-only</td>
-                  <td>
-                    <RiskChip label={candidate.state} tone="safe" />
-                  </td>
+              {rows.length > 0 ? (
+                rows.map((candidate) => (
+                  <tr key={`${candidate.symbol}-${candidate.strategy}`}>
+                    <td>{candidate.symbol}</td>
+                    <td>{candidate.strategy}</td>
+                    <td>{candidate.score.toFixed(2)}</td>
+                    <td>{candidate.holdout.toFixed(2)} report-only</td>
+                    <td>
+                      <RiskChip label={candidate.state} tone="safe" />
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5}>No consistency-selected candidates</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -46,6 +57,10 @@ export function ResearchLab() {
           <h2>Backtest evidence</h2>
         </div>
         <p className="muted-copy">Holdout metrics are shown for audit only and never used for selection.</p>
+        <p className="muted-copy">{consistentLabel}</p>
+        {research.missingArtifacts.length > 0 ? (
+          <p className="muted-copy">Missing artifacts: {research.missingArtifacts.join(', ')}</p>
+        ) : null}
       </section>
     </section>
   )

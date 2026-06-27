@@ -1,4 +1,7 @@
+import csv
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -16,6 +19,7 @@ from stock_trade.api.schemas import (
     OrdersResponse,
     PaperExecuteRequest,
     PositionsResponse,
+    ResearchArtifactsResponse,
     RiskStatusResponse,
     RunResponse,
     RunsResponse,
@@ -71,10 +75,12 @@ def create_app(
     store: SQLiteStore | None = None,
     broker_snapshot: BrokerSnapshotProtocol | None = None,
     paper_executor: PaperExecutorProtocol | None = None,
+    research_artifacts_dir: Path | None = None,
 ) -> FastAPI:
     app_settings = settings or get_settings()
     app_store = store or SQLiteStore(app_settings_path())
     broker = broker_snapshot or EmptyBrokerSnapshot()
+    artifacts_dir = research_artifacts_dir or Path("artifacts/research")
     initial_mode = LoopMode.PAPER if app_settings.trading_mode == "paper" else LoopMode.RESEARCH
     state = {"value": LoopState(mode=initial_mode)}
     app = FastAPI(title="stock-trade dashboard API")
@@ -147,6 +153,16 @@ def create_app(
             mode=app_settings.trading_mode,
             execution_enabled=_execution_enabled(app_settings),
             runs=app_store.list_runs(),
+        )
+
+    @app.get("/api/research/artifacts/latest", response_model=ResearchArtifactsResponse)
+    def latest_research_artifacts() -> ResearchArtifactsResponse:
+        artifacts, missing = _read_research_artifacts(artifacts_dir)
+        return ResearchArtifactsResponse(
+            mode=app_settings.trading_mode,
+            execution_enabled=_execution_enabled(app_settings),
+            artifacts=artifacts,
+            missing=missing,
         )
 
     @app.get("/api/research/runs/{run_id}", response_model=RunResponse)
@@ -276,9 +292,34 @@ def create_app(
 
 
 def app_settings_path():
-    from pathlib import Path
-
     return Path("artifacts/ralph.db")
+
+
+def _read_research_artifacts(artifacts_dir: Path) -> tuple[dict[str, Any], list[str]]:
+    artifacts: dict[str, Any] = {}
+    missing: list[str] = []
+    for file_name, artifact_name, reader in [
+        ("leaderboard.csv", "leaderboard", _read_csv_rows),
+        ("walk_forward_summary.csv", "walk_forward_summary", _read_csv_rows),
+        ("research_loop_summary.csv", "research_loop_summary", _read_csv_rows),
+        ("trade_plan.json", "trade_plan", _read_json_object),
+        ("consistent_trade_plan.json", "consistent_trade_plan", _read_json_object),
+    ]:
+        path = artifacts_dir / file_name
+        if not path.exists():
+            missing.append(file_name)
+            continue
+        artifacts[artifact_name] = reader(path)
+    return artifacts, missing
+
+
+def _read_csv_rows(path: Path) -> list[dict[str, str]]:
+    with path.open(newline="", encoding="utf-8") as file:
+        return list(csv.DictReader(file))
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _execution_enabled(settings: Settings, state: LoopState | None = None) -> bool:
