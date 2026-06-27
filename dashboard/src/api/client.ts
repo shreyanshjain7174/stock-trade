@@ -98,14 +98,18 @@ interface ApiResearchArtifactsResponse {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
 export async function fetchDashboardStatus(signal?: AbortSignal): Promise<DashboardStatus> {
-  const [health, account, risk, positions, orders, researchArtifacts] = await Promise.all([
+  const [health, account, risk, positions, orders] = await Promise.all([
     getJson<ApiHealthResponse>('/health', signal),
     getJson<ApiAccountResponse>('/api/account/snapshot', signal),
     getJson<ApiRiskResponse>('/api/risk/status', signal),
     getJson<ApiPositionsResponse>('/api/positions', signal),
     getJson<ApiOrdersResponse>('/api/orders/open', signal),
-    getJson<ApiResearchArtifactsResponse>('/api/research/artifacts/latest', signal),
   ])
+  const researchArtifacts = await getOptionalJson<ApiResearchArtifactsResponse>(
+    '/api/research/artifacts/latest',
+    signal,
+    { artifacts: {}, missing: ['research artifacts unavailable'] },
+  )
 
   const equity = account.snapshot?.equity ?? 100000
   const mappedPositions = (positions.positions ?? []).map((position) => ({
@@ -210,4 +214,12 @@ async function getJson<T>(
     throw new Error(`Request failed: ${path}`)
   }
   return (await response.json()) as T
+}
+
+async function getOptionalJson<T>(path: string, signal: AbortSignal | undefined, fallback: T): Promise<T> {
+  try {
+    return await getJson<T>(path, signal)
+  } catch {
+    return fallback
+  }
 }

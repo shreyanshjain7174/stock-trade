@@ -188,6 +188,79 @@ describe('App safety shell', () => {
     expect(screen.getByText('1 consistent item')).toBeInTheDocument()
   })
 
+  it('does not show mock candidates when backend artifacts are empty', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/health')) {
+        return Promise.resolve(Response.json({ mode: 'paper', execution_enabled: false }))
+      }
+      if (url.endsWith('/api/account/snapshot')) {
+        return Promise.resolve(
+          Response.json({ snapshot: { mode: 'paper', equity: 100000, cash: 90000 } }),
+        )
+      }
+      if (url.endsWith('/api/risk/status')) {
+        return Promise.resolve(Response.json({ risk: { cash_buffer_pct: 0.1 } }))
+      }
+      if (url.endsWith('/api/positions')) {
+        return Promise.resolve(Response.json({ positions: [] }))
+      }
+      if (url.endsWith('/api/orders/open')) {
+        return Promise.resolve(Response.json({ orders: [] }))
+      }
+      if (url.endsWith('/api/research/artifacts/latest')) {
+        return Promise.resolve(
+          Response.json({
+            artifacts: { consistent_trade_plan: { items: [] }, research_loop_summary: [] },
+            missing: [],
+          }),
+        )
+      }
+      return Promise.reject(new Error(`unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Research' }))
+
+    expect(await screen.findByText('No consistency-selected candidates')).toBeInTheDocument()
+    expect(screen.queryByText('trend_sma_50_150')).not.toBeInTheDocument()
+  })
+
+  it('keeps core dashboard live when research artifacts fail to load', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/health')) {
+        return Promise.resolve(Response.json({ mode: 'paper', execution_enabled: false }))
+      }
+      if (url.endsWith('/api/account/snapshot')) {
+        return Promise.resolve(
+          Response.json({ snapshot: { mode: 'paper', equity: 125000, cash: 90000 } }),
+        )
+      }
+      if (url.endsWith('/api/risk/status')) {
+        return Promise.resolve(Response.json({ risk: { cash_buffer_pct: 0.1 } }))
+      }
+      if (url.endsWith('/api/positions')) {
+        return Promise.resolve(Response.json({ positions: [] }))
+      }
+      if (url.endsWith('/api/orders/open')) {
+        return Promise.resolve(Response.json({ orders: [] }))
+      }
+      if (url.endsWith('/api/research/artifacts/latest')) {
+        return Promise.resolve(Response.json({ detail: 'artifact read failed' }, { status: 500 }))
+      }
+      return Promise.reject(new Error(`unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    expect(await screen.findByText('paper linked')).toBeInTheDocument()
+    expect(screen.queryByText(/API unavailable/)).not.toBeInTheDocument()
+  })
+
   it('renders all five dashboard screens without hiding safety status', () => {
     render(<App />)
 
