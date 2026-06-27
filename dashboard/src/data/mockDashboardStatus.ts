@@ -29,5 +29,13 @@ export const mockDashboardStatus: DashboardStatus = {
     { name: 'Limit', status: 'done', summary: 'Cash buffer and max-position gates passed.' },
     { name: 'Plan', status: 'done', summary: 'Paper plan persisted with stable client order IDs.' },
   ],
+  research: {
+    candidates: [
+      { symbol: 'SPY', strategy: 'trend_sma_50_150', score: 0.6, holdout: 1.78, state: 'approved' },
+      { symbol: 'QQQ', strategy: 'trend_sma_50_200', score: 0.3, holdout: 2.02, state: 'resized' },
+    ],
+    loopSummary: { iteration: 1, consistentItems: 2 },
+    missingArtifacts: [],
+  },
   equityCurve: [62, 58, 55, 52, 44, 48, 42, 38, 35, 28, 22, 18],
 }

@@ -47,6 +47,11 @@ class LeaderboardResponse(ModeStatus):
     plan: dict[str, Any]
 
 
+class ResearchArtifactsResponse(ModeStatus):
+    artifacts: dict[str, Any] = Field(default_factory=dict)
+    missing: list[str] = Field(default_factory=list)
+
+
 class TraceResponse(ModeStatus):
     trace: list[dict[str, Any]] = Field(default_factory=list)
 

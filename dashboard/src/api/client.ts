@@ -32,6 +32,17 @@ export interface DashboardStatus {
     status: 'done' | 'blocked' | 'pending'
     summary: string
   }>
+  research: {
+    candidates: Array<{
+      symbol: string
+      strategy: string
+      score: number
+      holdout: number
+      state: string
+    }>
+    loopSummary: { iteration: number; consistentItems: number } | null
+    missingArtifacts: string[]
+  }
   equityCurve: number[]
 }
 
@@ -66,15 +77,34 @@ interface ApiOrdersResponse {
   orders?: Array<{ id?: string; symbol?: string; notional?: number; status?: string }>
 }
 
+interface ApiResearchArtifactsResponse {
+  artifacts?: {
+    consistent_trade_plan?: {
+      items?: Array<{
+        symbol?: string
+        strategy?: string
+        score?: number | string
+        test_sharpe?: number | string
+      }>
+    }
+    research_loop_summary?: Array<{
+      iteration?: number | string
+      consistent_items?: number | string
+    }>
+  }
+  missing?: string[]
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
 export async function fetchDashboardStatus(signal?: AbortSignal): Promise<DashboardStatus> {
-  const [health, account, risk, positions, orders] = await Promise.all([
+  const [health, account, risk, positions, orders, researchArtifacts] = await Promise.all([
     getJson<ApiHealthResponse>('/health', signal),
     getJson<ApiAccountResponse>('/api/account/snapshot', signal),
     getJson<ApiRiskResponse>('/api/risk/status', signal),
     getJson<ApiPositionsResponse>('/api/positions', signal),
     getJson<ApiOrdersResponse>('/api/orders/open', signal),
+    getJson<ApiResearchArtifactsResponse>('/api/research/artifacts/latest', signal),
   ])
 
   const equity = account.snapshot?.equity ?? 100000
@@ -120,8 +150,42 @@ export async function fetchDashboardStatus(signal?: AbortSignal): Promise<Dashbo
       { name: 'Analyze', status: 'pending', summary: 'Committee trace will appear after the next run.' },
       { name: 'Limit', status: 'pending', summary: 'Risk gate is idle.' },
     ],
+    research: mapResearchArtifacts(researchArtifacts),
     equityCurve: [64, 60, 59, 52, 48, 45, 44, 39, 35, 32, 30, 26],
   }
+}
+
+function mapResearchArtifacts(artifactsResponse: ApiResearchArtifactsResponse): DashboardStatus['research'] {
+  const candidates = (artifactsResponse.artifacts?.consistent_trade_plan?.items ?? []).map(
+    (item) => ({
+      symbol: item.symbol ?? 'N/A',
+      strategy: item.strategy ?? 'unknown',
+      score: toNumber(item.score),
+      holdout: toNumber(item.test_sharpe),
+      state: 'consistent',
+    }),
+  )
+  const loopRows = artifactsResponse.artifacts?.research_loop_summary ?? []
+  const latestLoop = loopRows.at(-1)
+
+  return {
+    candidates,
+    loopSummary: latestLoop
+      ? {
+          iteration: toNumber(latestLoop.iteration),
+          consistentItems: toNumber(latestLoop.consistent_items),
+        }
+      : null,
+    missingArtifacts: artifactsResponse.missing ?? [],
+  }
+}
+
+function toNumber(value: number | string | undefined): number {
+  if (typeof value === 'number') {
+    return value
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 export async function triggerKillSwitch(reason: string): Promise<{

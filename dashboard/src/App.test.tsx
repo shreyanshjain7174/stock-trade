@@ -58,6 +58,9 @@ describe('App safety shell', () => {
       if (url.endsWith('/api/orders/open')) {
         return Promise.resolve(Response.json({ orders: [] }))
       }
+      if (url.endsWith('/api/research/artifacts/latest')) {
+        return Promise.resolve(Response.json({ artifacts: {}, missing: [] }))
+      }
       if (url.endsWith('/api/system/kill-switch')) {
         return Promise.resolve(
           Response.json({
@@ -106,6 +109,9 @@ describe('App safety shell', () => {
       if (url.endsWith('/api/orders/open')) {
         return Promise.resolve(Response.json({ orders: [] }))
       }
+      if (url.endsWith('/api/research/artifacts/latest')) {
+        return Promise.resolve(Response.json({ artifacts: {}, missing: [] }))
+      }
       return Promise.reject(new Error(`unexpected request: ${url}`))
     })
     vi.stubGlobal('fetch', fetchMock)
@@ -118,7 +124,7 @@ describe('App safety shell', () => {
     })
 
     expect(screen.getByText('paper linked')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(15_000)
@@ -126,7 +132,60 @@ describe('App safety shell', () => {
       await Promise.resolve()
     })
 
-    expect(fetchMock).toHaveBeenCalledTimes(10)
+    expect(fetchMock).toHaveBeenCalledTimes(12)
+  })
+
+  it('renders backend research artifact candidates', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/health')) {
+        return Promise.resolve(Response.json({ mode: 'paper', execution_enabled: false }))
+      }
+      if (url.endsWith('/api/account/snapshot')) {
+        return Promise.resolve(
+          Response.json({ snapshot: { mode: 'paper', equity: 100000, cash: 90000 } }),
+        )
+      }
+      if (url.endsWith('/api/risk/status')) {
+        return Promise.resolve(Response.json({ risk: { cash_buffer_pct: 0.1 } }))
+      }
+      if (url.endsWith('/api/positions')) {
+        return Promise.resolve(Response.json({ positions: [] }))
+      }
+      if (url.endsWith('/api/orders/open')) {
+        return Promise.resolve(Response.json({ orders: [] }))
+      }
+      if (url.endsWith('/api/research/artifacts/latest')) {
+        return Promise.resolve(
+          Response.json({
+            artifacts: {
+              consistent_trade_plan: {
+                items: [
+                  {
+                    symbol: 'XLK',
+                    strategy: 'swing_momentum_10_30',
+                    score: 0.74,
+                    test_sharpe: 1.76,
+                  },
+                ],
+              },
+              research_loop_summary: [{ iteration: '1', consistent_items: '1' }],
+            },
+            missing: [],
+          }),
+        )
+      }
+      return Promise.reject(new Error(`unexpected request: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Research' }))
+
+    expect(await screen.findByText('XLK')).toBeInTheDocument()
+    expect(screen.getByText('swing_momentum_10_30')).toBeInTheDocument()
+    expect(screen.getByText('1 consistent item')).toBeInTheDocument()
   })
 
   it('renders all five dashboard screens without hiding safety status', () => {

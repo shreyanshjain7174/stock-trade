@@ -135,7 +135,7 @@ function App() {
         <CommandCenter dashboard={dashboard} riskAlerts={riskAlerts} />
       ) : null}
       {activeScreen === 'timeline' ? <AgentTimeline timeline={dashboard.agentTimeline} /> : null}
-      {activeScreen === 'research' ? <ResearchLab /> : null}
+      {activeScreen === 'research' ? <ResearchLab research={dashboard.research} /> : null}
       {activeScreen === 'risk' ? <RiskCockpit dashboard={dashboard} /> : null}
       {activeScreen === 'settings' ? <SettingsIntegrations dashboard={dashboard} /> : null}
     </main>
